@@ -3,14 +3,18 @@
   <head>
     <title>Game</title>
     <link rel="stylesheet" href="styles.css" />
+    <!-- scale -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   </head>
   <body>
+    <div class="game-header-info">
+      <div class="moves-left">Strokes: <span id="movesLeft">0</span></div>
+    </div>
+    <canvas></canvas>
     <div class="dice-container">
       <button id="diceButton" class="dice-button">🎲 Roll!</button>
       <div id="diceResult" class="dice-result">?</div>
-      <div class="moves-left">Moves: <span id="movesLeft">0</span></div>
     </div>
-    <canvas></canvas>
     <script src="game.js"></script>
   </body>
 </html>

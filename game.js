@@ -481,7 +481,7 @@ canvas.addEventListener("click", (event) => {
   // Check if clicked position is highlighted
   if (highlightedPositions.has(`${clickX},${clickY}`)) {
     // Play golf hit sound
-    golfHitSound.currentTime = 0; // Reset sound to start
+    golfHitSound.currentTime = 0;
     golfHitSound
       .play()
       .catch((error) => console.log("Error playing sound:", error));
@@ -492,7 +492,7 @@ canvas.addEventListener("click", (event) => {
     const endX = clickX * CONTAINER_SIZE + CONTAINER_SIZE / 2;
     const endY = clickY * CONTAINER_SIZE + CONTAINER_SIZE / 2;
 
-    // Calculate movement path
+    // Calculate movement path for history
     const dx = clickX - GOLF.ball.x;
     const dy = clickY - GOLF.ball.y;
     const moveSteps = [];
@@ -566,50 +566,69 @@ canvas.addEventListener("click", (event) => {
     }
 
     // Animate the movement
-    let stepIndex = 0;
-    const animateMove = () => {
-      if (stepIndex < moveSteps.length) {
-        // Clear and redraw
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawContainers();
-        addRandomTrees();
+    const ANIMATION_DURATION = 1200; // Increased from 500 to 800ms for smoother movement
+    const startTime = Date.now();
 
-        // Draw path up to current position
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-        ctx.lineWidth = 2;
-        ctx.moveTo(startX, startY);
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const rawProgress = getAnimationProgress(elapsed, ANIMATION_DURATION);
+      const progress = easeInOutQuad(rawProgress);
 
-        for (let i = 0; i <= stepIndex; i++) {
-          const step = moveSteps[i];
-          ctx.lineTo(
-            step.x * CONTAINER_SIZE + CONTAINER_SIZE / 2,
-            step.y * CONTAINER_SIZE + CONTAINER_SIZE / 2
-          );
-        }
-        ctx.stroke();
+      // Clear and redraw
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawContainers();
+      addRandomTrees();
 
-        // Update ball position
-        GOLF.ball.x = moveSteps[stepIndex].x;
-        GOLF.ball.y = moveSteps[stepIndex].y;
-        drawGolfElements();
+      // Draw historical paths
+      for (const move of moveHistory) {
+        drawHistoricalPath(move);
+      }
 
-        // Show move type
-        const moveType = moveSteps[stepIndex].type;
-        ctx.fillStyle =
-          moveType === "diagonal"
-            ? "rgba(255, 0, 0, 0.3)"
-            : "rgba(0, 255, 0, 0.3)";
+      // Draw current movement path with smoother line
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round"; // Add rounded line caps
+      ctx.lineJoin = "round"; // Add rounded line joins
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(lerp(startX, endX, progress), lerp(startY, endY, progress));
+      ctx.stroke();
+
+      // Draw ball at interpolated position with anti-aliasing
+      const currentX = lerp(startX, endX, progress);
+      const currentY = lerp(startY, endY, progress);
+
+      ctx.beginPath();
+      ctx.fillStyle = "#000000";
+      ctx.shadowBlur = 1; // Add slight shadow for smoother appearance
+      ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+      ctx.arc(currentX, currentY, GOLF.ball.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0; // Reset shadow
+
+      // Color the path based on movement type
+      const isMoveDiagonal = Math.abs(dx) === Math.abs(dy);
+      ctx.fillStyle = isMoveDiagonal
+        ? "rgba(255, 0, 0, 0.2)"
+        : "rgba(0, 255, 0, 0.2)";
+
+      // Draw colored squares for the path
+      for (const step of moveSteps) {
         ctx.fillRect(
-          GOLF.ball.x * CONTAINER_SIZE,
-          GOLF.ball.y * CONTAINER_SIZE,
+          step.x * CONTAINER_SIZE,
+          step.y * CONTAINER_SIZE,
           CONTAINER_SIZE,
           CONTAINER_SIZE
         );
+      }
 
-        stepIndex++;
-        requestAnimationFrame(animateMove);
+      if (rawProgress < 1) {
+        requestAnimationFrame(animate);
       } else {
+        // Update final ball position
+        GOLF.ball.x = clickX;
+        GOLF.ball.y = clickY;
+
         // Final cleanup
         movesRemaining--;
         document.getElementById("movesLeft").textContent = movesRemaining;
@@ -632,44 +651,7 @@ canvas.addEventListener("click", (event) => {
 
         // Draw all historical paths
         for (const move of moveHistory) {
-          // Draw faded ball at move start
-          ctx.beginPath();
-          ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
-          ctx.arc(move.startX, move.startY, GOLF.ball.size / 2, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Draw movement path
-          ctx.beginPath();
-          ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
-          ctx.lineWidth = 2;
-          ctx.moveTo(move.startX, move.startY);
-
-          // Draw each step with its color
-          for (let i = 0; i < move.steps.length; i++) {
-            const step = move.steps[i];
-            const nextX = step.x * CONTAINER_SIZE + CONTAINER_SIZE / 2;
-            const nextY = step.y * CONTAINER_SIZE + CONTAINER_SIZE / 2;
-
-            // Draw step line
-            ctx.lineTo(nextX, nextY);
-            ctx.stroke();
-
-            // Draw step marker
-            ctx.fillStyle =
-              step.type === "diagonal"
-                ? "rgba(255, 0, 0, 0.2)"
-                : "rgba(0, 255, 0, 0.2)";
-            ctx.fillRect(
-              step.x * CONTAINER_SIZE,
-              step.y * CONTAINER_SIZE,
-              CONTAINER_SIZE,
-              CONTAINER_SIZE
-            );
-
-            // Start new path segment
-            ctx.beginPath();
-            ctx.moveTo(nextX, nextY);
-          }
+          drawHistoricalPath(move);
         }
 
         drawGolfElements();
@@ -677,6 +659,73 @@ canvas.addEventListener("click", (event) => {
     };
 
     // Start animation
-    animateMove();
+    animate();
   }
 });
+
+// Add helper function for linear interpolation
+function lerp(start, end, progress) {
+  return start + (end - start) * progress;
+}
+
+// Add helper function to draw historical paths
+function drawHistoricalPath(move) {
+  // Draw faded ball at move start
+  ctx.beginPath();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+  ctx.arc(move.startX, move.startY, GOLF.ball.size / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw movement path with greenish tint
+  ctx.beginPath();
+  ctx.strokeStyle = "rgba(76, 175, 80, 0.3)"; // Light green stroke
+  ctx.lineWidth = 2;
+  ctx.moveTo(move.startX, move.startY);
+
+  // Draw path line
+  const endX = move.endX;
+  const endY = move.endY;
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  // Draw rounded greenish squares for each step
+  ctx.fillStyle = "rgba(76, 175, 80, 0.15)"; // Light green fill
+
+  for (const step of move.steps) {
+    const x = step.x * CONTAINER_SIZE;
+    const y = step.y * CONTAINER_SIZE;
+    const size = CONTAINER_SIZE;
+    const radius = 4; // Corner radius
+
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + size - radius, y);
+    ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+    ctx.lineTo(x + size, y + size - radius);
+    ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+    ctx.lineTo(x + radius, y + size);
+    ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// Add after other helper functions
+function easeInOutQuad(t) {
+  // Custom easing function that combines cubic and quadratic easing
+  if (t < 0.5) {
+    // Smooth acceleration in first half
+    return 4 * t * t * t;
+  } else {
+    // Gradual deceleration in second half
+    const p = 2 * t - 2;
+    return 0.5 * p * p * p + 1;
+  }
+}
+
+// Add this function to help with smoother animation timing
+function getAnimationProgress(elapsed, duration) {
+  return Math.min(elapsed / duration, 1);
+}
