@@ -1,0 +1,67 @@
+body {
+    display: flex;
+    padding: 20px;
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+canvas {}
+
+.dice-container {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.dice-button {
+    background: linear-gradient(145deg, #ffd1ff, #ff9ecd);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1),
+                -3px -3px 10px rgba(255,255,255,0.8);
+    transition: all 0.3s ease;
+    font-family: Arial, sans-serif;
+    color: #444;
+}
+
+.dice-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 4px 4px 12px rgba(0,0,0,0.15),
+                -4px -4px 12px rgba(255,255,255,0.9);
+}
+
+.dice-button:active {
+    transform: translateY(1px);
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.1),
+                -2px -2px 8px rgba(255,255,255,0.7);
+}
+
+.dice-result {
+    background: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: bold;
+    color: #444;
+    box-shadow: inset 2px 2px 8px rgba(0,0,0,0.1),
+                inset -2px -2px 8px rgba(255,255,255,0.8);
+    font-family: Arial, sans-serif;
+}
