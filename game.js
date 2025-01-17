@@ -729,3 +729,59 @@ function easeInOutQuad(t) {
 function getAnimationProgress(elapsed, duration) {
   return Math.min(elapsed / duration, 1);
 }
+
+// Add this near the beginning of your file with other DOM element selections
+const refreshButton = document.getElementById("refreshButton");
+
+// Add this with your other event listeners
+refreshButton.addEventListener("click", () => {
+  // Reset game state
+  initializeGame(); // Assuming you have this function that sets up a new game
+  movesLeft = 0;
+  document.getElementById("movesLeft").textContent = movesLeft;
+  diceResult.textContent = "?";
+});
+
+// Add this function after other initializations but before event listeners
+function initializeGame() {
+  // Reset game state variables
+  currentDiceValue = 0;
+  movesRemaining = 0;
+  moveHistory = [];
+  highlightedPositions.clear();
+  treePositions.clear();
+
+  // Generate new pond position and shape
+  POND.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 14));
+  POND.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 14));
+  POND.width = Math.floor(Math.random() * 9) + 6;
+
+  do {
+    POND.height = Math.floor(Math.random() * 9) + 6;
+  } while (POND.height === POND.width);
+
+  // Generate new pond shape
+  const newPondShape = generatePondShape();
+  Object.assign(pondShape, newPondShape);
+
+  // Find new valid positions for ball and hole
+  do {
+    GOLF.ball.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 4));
+    GOLF.ball.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 4));
+  } while (!isValidGolfPosition(GOLF.ball.x, GOLF.ball.y));
+
+  do {
+    GOLF.hole.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 4));
+    GOLF.hole.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 4));
+  } while (
+    !isValidGolfPosition(GOLF.hole.x, GOLF.hole.y) ||
+    Math.abs(GOLF.ball.x - GOLF.hole.x) < 5 ||
+    Math.abs(GOLF.ball.y - GOLF.hole.y) < 5
+  );
+
+  // Redraw everything
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawContainers();
+  addRandomTrees();
+  drawGolfElements();
+}

@@ -5,12 +5,33 @@
     <link rel="stylesheet" href="styles.css" />
     <!-- scale -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <div class="game-header-info">
+    <div class="header">
+      <div>
+        <img src="icons/hamburger.svg" width="28px" alt="hamburger" />
+      </div>
       <div class="moves-left">Strokes: <span id="movesLeft">0</span></div>
+      <div>
+        <img
+          src="icons/refresh.svg"
+          width="28px"
+          alt="refresh"
+          id="refreshButton"
+          style="cursor: pointer"
+        />
+      </div>
     </div>
-    <canvas></canvas>
+    <div class="game-container">
+      <canvas></canvas>
+    </div>
+
     <div class="dice-container">
       <button id="diceButton" class="dice-button">🎲 Roll!</button>
       <div id="diceResult" class="dice-result">?</div>
