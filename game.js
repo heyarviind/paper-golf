@@ -10,7 +10,7 @@ const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
 // Set canvas dimensions based on container size and count
-const CONTAINER_SIZE = 24; // 6px x 6px containers
+let CONTAINER_SIZE = 24; // 6px x 6px containers
 const CONTAINER_WIDTH_COUNT = 16;
 const CONTAINER_HEIGHT_COUNT = 26;
 
@@ -36,7 +36,115 @@ do {
 } while (POND.height === POND.width);
 
 // Add after POND initialization
+function generatePondShape() {
+  const pondMap = Array(POND.height)
+    .fill()
+    .map(() => Array(POND.width).fill(false));
+  const centerX = Math.floor(POND.width / 2);
+  const centerY = Math.floor(POND.height / 2);
+
+  // Generate main pond shape
+  for (let y = 0; y < POND.height; y++) {
+    for (let x = 0; x < POND.width; x++) {
+      // Distance from center
+      const dx = (x - centerX) / POND.width;
+      const dy = (y - centerY) / POND.height;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Random noise factor
+      const noise = Math.random() * 0.3;
+
+      // Create irregular shape with some randomness
+      if (distance + noise < 0.5) {
+        pondMap[y][x] = true;
+      }
+    }
+  }
+
+  // Add some natural variation to edges
+  for (let y = 1; y < POND.height - 1; y++) {
+    for (let x = 1; x < POND.width - 1; x++) {
+      if (pondMap[y][x]) {
+        if (Math.random() < 0.1) {
+          const neighbors = [
+            pondMap[y - 1][x],
+            pondMap[y + 1][x],
+            pondMap[y][x - 1],
+            pondMap[y][x + 1],
+          ];
+          const waterNeighbors = neighbors.filter((n) => n).length;
+          if (waterNeighbors <= 1) {
+            pondMap[y][x] = false;
+          }
+        }
+      }
+    }
+  }
+
+  return pondMap;
+}
+
+// Initialize pond shape
 const pondShape = generatePondShape();
+
+// Then initialize SAND and sandShape
+const SAND = {
+  x: Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 8)),
+  y: Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 8)),
+  width: Math.floor(Math.random() * 5) + 4,
+  height: Math.floor(Math.random() * 5) + 4,
+};
+
+const sandShape = generateSandShape();
+
+// Add after generatePondShape function
+function generateSandShape() {
+  const sandMap = Array(SAND.height)
+    .fill()
+    .map(() => Array(SAND.width).fill(false));
+  const centerX = Math.floor(SAND.width / 2);
+  const centerY = Math.floor(SAND.height / 2);
+
+  // Generate main sand shape
+  for (let y = 0; y < SAND.height; y++) {
+    for (let x = 0; x < SAND.width; x++) {
+      // Distance from center
+      const dx = (x - centerX) / SAND.width;
+      const dy = (y - centerY) / SAND.height;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Random noise factor
+      const noise = Math.random() * 0.3;
+
+      // Create irregular shape with some randomness
+      if (distance + noise < 0.5) {
+        sandMap[y][x] = true;
+      }
+    }
+  }
+
+  // Add some natural variation to edges
+  for (let y = 1; y < SAND.height - 1; y++) {
+    for (let x = 1; x < SAND.width - 1; x++) {
+      if (sandMap[y][x]) {
+        if (Math.random() < 0.1) {
+          const neighbors = [
+            sandMap[y - 1][x],
+            sandMap[y + 1][x],
+            sandMap[y][x - 1],
+            sandMap[y][x + 1],
+          ];
+          const sandNeighbors = neighbors.filter((n) => n).length;
+          if (sandNeighbors <= 1) {
+            sandMap[y][x] = false;
+          }
+        }
+      }
+    }
+  }
+
+  return sandMap;
+}
 
 // Add after other initializations but before any functions
 let treePositions = new Set(); // Store tree positions
@@ -45,6 +153,11 @@ let treePositions = new Set(); // Store tree positions
 function isValidGolfPosition(x, y) {
   // Check if position is inside pond
   if (isInsidePond(x, y)) {
+    return false;
+  }
+
+  // Check if position is inside sand
+  if (isInsideSand(x, y)) {
     return false;
   }
 
@@ -101,11 +214,22 @@ function isInsidePond(x, y) {
   );
 }
 
+// Add after isInsidePond function
+function isInsideSand(x, y) {
+  const localX = x - SAND.x;
+  const localY = y - SAND.y;
+  return (
+    localX >= 0 &&
+    localX < SAND.width &&
+    localY >= 0 &&
+    localY < SAND.height &&
+    sandShape[localY][localX]
+  );
+}
+
 // Wait for image to load before drawing
 treeImage.onload = () => {
-  drawContainers();
-  addRandomTrees();
-  drawGolfElements();
+  setupCanvas();
 };
 
 // Function to draw containers with gray dots
@@ -206,6 +330,103 @@ function drawContainers() {
       ctx.fill();
     }
   }
+
+  // Draw sand tiles with rounded corners
+  ctx.fillStyle = "#FFE4B5"; // Light orange/sand color
+  for (let y = 0; y < SAND.height; y++) {
+    for (let x = 0; x < SAND.width; x++) {
+      if (!sandShape[y][x]) continue;
+
+      const posX = (SAND.x + x) * CONTAINER_SIZE;
+      const posY = (SAND.y + y) * CONTAINER_SIZE;
+
+      ctx.beginPath();
+      const radius = 8;
+
+      // Check adjacent tiles to determine which corners to round
+      const hasTop = y > 0 && sandShape[y - 1][x];
+      const hasBottom = y < SAND.height - 1 && sandShape[y + 1][x];
+      const hasLeft = x > 0 && sandShape[y][x - 1];
+      const hasRight = x < SAND.width - 1 && sandShape[y][x + 1];
+
+      // Draw tile with appropriate rounded corners (same logic as pond)
+      ctx.moveTo(posX + radius, posY);
+
+      // Top right
+      if (!hasTop && !hasRight) {
+        ctx.lineTo(posX + CONTAINER_SIZE - radius, posY);
+        ctx.arcTo(
+          posX + CONTAINER_SIZE,
+          posY,
+          posX + CONTAINER_SIZE,
+          posY + radius,
+          radius
+        );
+      } else {
+        ctx.lineTo(posX + CONTAINER_SIZE, posY);
+      }
+
+      // Bottom right
+      if (!hasBottom && !hasRight) {
+        ctx.lineTo(posX + CONTAINER_SIZE, posY + CONTAINER_SIZE - radius);
+        ctx.arcTo(
+          posX + CONTAINER_SIZE,
+          posY + CONTAINER_SIZE,
+          posX + CONTAINER_SIZE - radius,
+          posY + CONTAINER_SIZE,
+          radius
+        );
+      } else {
+        ctx.lineTo(posX + CONTAINER_SIZE, posY + CONTAINER_SIZE);
+      }
+
+      // Bottom left
+      if (!hasBottom && !hasLeft) {
+        ctx.lineTo(posX + radius, posY + CONTAINER_SIZE);
+        ctx.arcTo(
+          posX,
+          posY + CONTAINER_SIZE,
+          posX,
+          posY + CONTAINER_SIZE - radius,
+          radius
+        );
+      } else {
+        ctx.lineTo(posX, posY + CONTAINER_SIZE);
+      }
+
+      // Top left
+      if (!hasTop && !hasLeft) {
+        ctx.lineTo(posX, posY + radius);
+        ctx.arcTo(posX, posY, posX + radius, posY, radius);
+      } else {
+        ctx.lineTo(posX, posY);
+      }
+
+      ctx.closePath();
+      ctx.fill();
+
+      // Add sand texture dots
+      ctx.fillStyle = "#FFE4B5"; // Darker sand color
+      const dotCount = 6; // Number of dots per tile
+      const dotSize = 1; // Size of dots
+      const padding = CONTAINER_SIZE * 0.2; // Padding from edges
+
+      // Add random dots
+      for (let i = 0; i < dotCount; i++) {
+        const dotX =
+          posX + padding + Math.random() * (CONTAINER_SIZE - 2 * padding);
+        const dotY =
+          posY + padding + Math.random() * (CONTAINER_SIZE - 2 * padding);
+
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Reset fillStyle for next drawing operations
+  ctx.fillStyle = "#FFE4B5";
 }
 
 // Modify addRandomTrees to store positions
@@ -247,95 +468,6 @@ function addRandomTrees() {
   }
 }
 
-// Add after POND definition
-function generatePondShape() {
-  const pondMap = Array(POND.height)
-    .fill()
-    .map(() => Array(POND.width).fill(false));
-  const centerX = Math.floor(POND.width / 2);
-  const centerY = Math.floor(POND.height / 2);
-
-  // Generate main pond shape
-  for (let y = 0; y < POND.height; y++) {
-    for (let x = 0; x < POND.width; x++) {
-      // Distance from center
-      const dx = (x - centerX) / POND.width;
-      const dy = (y - centerY) / POND.height;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // Random noise factor
-      const noise = Math.random() * 0.3;
-
-      // Create irregular shape with some randomness
-      if (distance + noise < 0.5) {
-        pondMap[y][x] = true;
-      }
-    }
-  }
-
-  // Possibly add a connected secondary pond
-  if (Math.random() < 0.5) {
-    // 50% chance for second pond
-    const secondaryX = centerX + (Math.random() > 0.5 ? 2 : -2); // Offset from main pond
-    const secondaryY = centerY + (Math.random() > 0.5 ? 2 : -2);
-
-    // Create connecting path and secondary pond
-    for (let y = 0; y < POND.height; y++) {
-      for (let x = 0; x < POND.width; x++) {
-        // Distance from secondary center
-        const dx = (x - secondaryX) / (POND.width * 0.7); // Smaller radius
-        const dy = (y - secondaryY) / (POND.height * 0.7);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        // Random noise factor
-        const noise = Math.random() * 0.2;
-
-        // Add to existing pond
-        if (distance + noise < 0.4) {
-          pondMap[y][x] = true;
-        }
-      }
-    }
-
-    // Ensure connection between ponds
-    const pathX = Math.min(centerX, secondaryX);
-    const pathWidth = Math.abs(centerX - secondaryX);
-    const pathY = Math.min(centerY, secondaryY);
-    const pathHeight = Math.abs(centerY - secondaryY);
-
-    for (let y = pathY; y <= pathY + pathHeight; y++) {
-      for (let x = pathX; x <= pathX + pathWidth; x++) {
-        if (y >= 0 && y < POND.height && x >= 0 && x < POND.width) {
-          pondMap[y][x] = true;
-        }
-      }
-    }
-  }
-
-  // Add some natural variation to edges
-  for (let y = 1; y < POND.height - 1; y++) {
-    for (let x = 1; x < POND.width - 1; x++) {
-      if (pondMap[y][x]) {
-        // Randomly smooth or roughen edges
-        if (Math.random() < 0.1) {
-          const neighbors = [
-            pondMap[y - 1][x],
-            pondMap[y + 1][x],
-            pondMap[y][x - 1],
-            pondMap[y][x + 1],
-          ];
-          const waterNeighbors = neighbors.filter((n) => n).length;
-          if (waterNeighbors <= 1) {
-            pondMap[y][x] = false;
-          }
-        }
-      }
-    }
-  }
-
-  return pondMap;
-}
-
 // Add function to draw golf elements
 function drawGolfElements() {
   // Draw hole (hollow circle)
@@ -374,6 +506,7 @@ let currentDiceValue = 0;
 let movesRemaining = 0;
 let highlightedPositions = new Set(); // Store possible move positions
 let moveHistory = []; // Store all previous moves
+let strokeCount = 0;
 
 // Function to highlight possible moves
 function highlightPossibleMoves() {
@@ -442,12 +575,42 @@ function highlightPossibleMoves() {
     );
   }
   drawGolfElements();
+
+  // After checking all possible moves, check if any are valid
+  checkForValidMoves();
+}
+
+// Add this function after highlightPossibleMoves
+function checkForValidMoves() {
+  // If no highlighted positions after calculating moves
+  if (highlightedPositions.size === 0 && currentDiceValue > 0) {
+    // Add shake class
+    diceResult.classList.add("shake");
+
+    // Remove shake class after animation completes
+    setTimeout(() => {
+      diceResult.classList.remove("shake");
+
+      // Reset dice after a short delay
+      setTimeout(() => {
+        currentDiceValue = 0;
+        diceResult.textContent = "?";
+        diceButton.disabled = false;
+        movesRemaining = 0;
+        document.getElementById("movesLeft").textContent = movesRemaining;
+      }, 300);
+    }, 500);
+
+    return false;
+  }
+  return true;
 }
 
 // Modify dice roll handler
 diceButton.addEventListener("click", () => {
   diceButton.disabled = true;
-  highlightedPositions.clear(); // Clear old highlights
+  highlightedPositions.clear();
+  diceResult.classList.remove("shake"); // Reset shake class
 
   let rolls = 0;
   const maxRolls = 10;
@@ -458,11 +621,10 @@ diceButton.addEventListener("click", () => {
 
     if (rolls >= maxRolls) {
       clearInterval(rollInterval);
-      diceButton.disabled = false;
       currentDiceValue = rollValue;
       movesRemaining = rollValue;
       document.getElementById("movesLeft").textContent = movesRemaining;
-      highlightPossibleMoves(); // Add highlights after roll
+      highlightPossibleMoves(); // This will now check for valid moves
     }
   }, 100);
 });
@@ -629,11 +791,17 @@ canvas.addEventListener("click", (event) => {
         GOLF.ball.x = clickX;
         GOLF.ball.y = clickY;
 
-        // Final cleanup
+        // Update stroke count instead of moves remaining
+        strokeCount++;
+        document.getElementById("movesLeft").textContent = strokeCount;
+
+        // Rest of cleanup
         movesRemaining--;
-        document.getElementById("movesLeft").textContent = movesRemaining;
         highlightedPositions.clear();
         currentDiceValue = 0;
+
+        // Re-enable dice button after move is complete
+        diceButton.disabled = false;
 
         // Store this move in history
         moveHistory.push({
@@ -735,10 +903,8 @@ const refreshButton = document.getElementById("refreshButton");
 
 // Add this with your other event listeners
 refreshButton.addEventListener("click", () => {
-  // Reset game state
-  initializeGame(); // Assuming you have this function that sets up a new game
-  movesLeft = 0;
-  document.getElementById("movesLeft").textContent = movesLeft;
+  initializeGame();
+  diceButton.disabled = false;
   diceResult.textContent = "?";
 });
 
@@ -779,9 +945,98 @@ function initializeGame() {
     Math.abs(GOLF.ball.y - GOLF.hole.y) < 5
   );
 
+  // Generate new sand position
+  SAND.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 8));
+  SAND.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 8));
+  SAND.width = Math.floor(Math.random() * 5) + 4;
+  SAND.height = Math.floor(Math.random() * 5) + 4;
+
+  // Generate new sand shape
+  const newSandShape = generateSandShape();
+  Object.assign(sandShape, newSandShape);
+
   // Redraw everything
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawContainers();
   addRandomTrees();
   drawGolfElements();
+
+  // Reset stroke count
+  strokeCount = 0;
+  document.getElementById("movesLeft").textContent = strokeCount;
 }
+
+// Replace the existing canvas dimension setup with this code
+function setupCanvas() {
+  // Get the container width
+  const container = canvas.parentElement;
+  const containerWidth = container.clientWidth - 40; // Account for padding
+
+  // Calculate the best size that maintains aspect ratio
+  const aspectRatio = CONTAINER_HEIGHT_COUNT / CONTAINER_WIDTH_COUNT;
+
+  // Set canvas size based on container width
+  const baseSize = Math.min(containerWidth / CONTAINER_WIDTH_COUNT, 24);
+
+  // Update container size
+  CONTAINER_SIZE = baseSize;
+
+  // Set canvas dimensions
+  canvas.width = CONTAINER_SIZE * CONTAINER_WIDTH_COUNT;
+  canvas.height = CONTAINER_SIZE * CONTAINER_HEIGHT_COUNT;
+
+  // Set canvas CSS size
+  canvas.style.width = `${canvas.width}px`;
+  canvas.style.height = `${canvas.height}px`;
+
+  // Redraw everything
+  drawContainers();
+  addRandomTrees();
+  drawGolfElements();
+}
+
+// Add resize handler
+window.addEventListener("resize", debounce(setupCanvas, 250));
+
+// Add debounce function to prevent too many resize events
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Call setupCanvas instead of direct dimension setting
+setupCanvas();
+
+// Add near the top with other DOM element selections
+const menuButton = document.getElementById("menuButton");
+const menuOverlay = document.getElementById("menuOverlay");
+const sideMenu = document.getElementById("sideMenu");
+const closeMenu = document.getElementById("closeMenu");
+
+// Add menu event listeners
+menuButton.addEventListener("click", () => {
+  menuOverlay.classList.add("active");
+  sideMenu.classList.add("active");
+});
+
+closeMenu.addEventListener("click", closeMenuFunction);
+menuOverlay.addEventListener("click", closeMenuFunction);
+
+function closeMenuFunction() {
+  menuOverlay.classList.remove("active");
+  sideMenu.classList.remove("active");
+}
+
+// Add keyboard event listener for Escape key
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && menuOverlay.classList.contains("active")) {
+    closeMenuFunction();
+  }
+});
