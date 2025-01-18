@@ -22,6 +22,28 @@ canvas.height = CONTAINER_SIZE * CONTAINER_HEIGHT_COUNT; // 216px
 const treeImage = new Image();
 treeImage.src = "icons/tree.svg";
 
+// Add near the top with other image loading
+const arrowImage = new Image();
+arrowImage.src = "icons/arrow-up.svg";
+
+// Wait for both images to load before initializing
+let imagesLoaded = 0;
+const requiredImages = 2; // tree and arrow
+
+function onImageLoad() {
+  imagesLoaded++;
+  if (imagesLoaded === requiredImages) {
+    setupCanvas();
+    generateSlopes(); // Generate initial slopes
+  }
+}
+
+treeImage.onload = onImageLoad;
+arrowImage.onload = onImageLoad;
+
+// Initialize game objects
+const SLOPES = []; // Store slope positions and directions
+
 // Add after canvas dimensions setup and before image loading
 const POND = {
   x: Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 14)), // Random start X
@@ -425,7 +447,15 @@ function drawContainers() {
     }
   }
 
-  // Reset fillStyle for next drawing operations
+  // Draw slopes
+  if (SLOPES && SLOPES.length > 0) {
+    drawSlopes();
+  }
+
+  // Draw trees last so they appear on top
+  addRandomTrees();
+
+  // Reset fillStyle for next operations
   ctx.fillStyle = "#FFE4B5";
 }
 
@@ -833,9 +863,17 @@ canvas.addEventListener("click", (event) => {
       if (rawProgress < 1) {
         requestAnimationFrame(animate);
       } else {
-        // Update final ball position
-        GOLF.ball.x = clickX;
-        GOLF.ball.y = clickY;
+        // Get next position considering slopes
+        const nextPos = getNextPosition(clickX, clickY);
+
+        // Only apply slope effect if next position is valid
+        if (isValidGolfPosition(nextPos.x, nextPos.y)) {
+          GOLF.ball.x = nextPos.x;
+          GOLF.ball.y = nextPos.y;
+        } else {
+          GOLF.ball.x = clickX;
+          GOLF.ball.y = clickY;
+        }
 
         // Update stroke count
         strokeCount++;
@@ -1006,6 +1044,9 @@ function initializeGame() {
   // Generate new sand shape
   const newSandShape = generateSandShape();
   Object.assign(sandShape, newSandShape);
+
+  // Generate new slopes
+  generateSlopes();
 
   // Redraw everything
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1225,7 +1266,7 @@ function showRulesPopup() {
     },
     {
       title: "Obstacles",
-      text: "🌲 Trees: Cannot move through or land on trees\n💧 Water: Cannot move through or land on water\n🏖️ Sand: Requires one extra movement point to land on",
+      text: "🌲 Trees: Cannot move through or land on trees\n💧 Water: Cannot move through or land on water\n🏖️ Sand: Requires one extra movement point to land on\n➡️ Slopes: Ball will slide one space in arrow direction after landing",
     },
     {
       title: "Scoring",
@@ -1280,3 +1321,145 @@ const howToPlayButton = document.getElementById("howToPlay");
 if (howToPlayButton) {
   howToPlayButton.addEventListener("click", showRulesPopup);
 }
+
+// Add after other initialization functions
+function generateSlopes() {
+  // Clear existing slopes
+  SLOPES.length = 0;
+
+  // Generate 2-3 slopes
+  const slopeCount = Math.floor(Math.random() * 2) + 2; // Random number between 2 and 3
+
+  for (let i = 0; i < slopeCount; i++) {
+    let x, y, direction;
+    let isValidPosition = false;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    while (!isValidPosition && attempts < maxAttempts) {
+      x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 2)) + 1;
+      y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 2)) + 1;
+      direction = Math.floor(Math.random() * 4);
+
+      if (
+        !isInsidePond(x, y) &&
+        !isInsideSand(x, y) &&
+        !treePositions.has(`${x},${y}`) &&
+        !SLOPES.some((slope) => slope.x === x && slope.y === y) &&
+        !(x === GOLF.ball.x && y === GOLF.ball.y) &&
+        !(x === GOLF.hole.x && y === GOLF.hole.y)
+      ) {
+        isValidPosition = true;
+
+        const nextX = x + (direction === 1 ? 1 : direction === 3 ? -1 : 0);
+        const nextY = y + (direction === 2 ? 1 : direction === 0 ? -1 : 0);
+
+        if (
+          isInsidePond(nextX, nextY) ||
+          isInsideSand(nextX, nextY) ||
+          treePositions.has(`${nextX},${nextY}`) ||
+          SLOPES.some((slope) => slope.x === nextX && slope.y === nextY) ||
+          (nextX === GOLF.ball.x && nextY === GOLF.ball.y) ||
+          (nextX === GOLF.hole.x && nextY === GOLF.hole.y)
+        ) {
+          isValidPosition = false;
+        }
+      }
+      attempts++;
+    }
+
+    if (isValidPosition) {
+      SLOPES.push({ x, y, direction });
+    }
+  }
+
+  // If we couldn't place all slopes, try again
+  if (SLOPES.length < slopeCount) {
+    generateSlopes();
+  }
+}
+
+// Modify the drawSlopes function to make arrows more visible
+function drawSlopes() {
+  SLOPES.forEach((slope) => {
+    const posX = slope.x * CONTAINER_SIZE;
+    const posY = slope.y * CONTAINER_SIZE;
+    const arrowSize = CONTAINER_SIZE * 0.9; // Make arrow almost as big as container
+
+    // Save the current context state
+    ctx.save();
+
+    // Move to center of the container
+    ctx.translate(posX + CONTAINER_SIZE / 2, posY + CONTAINER_SIZE / 2);
+
+    // Rotate based on direction
+    switch (slope.direction) {
+      case 0: // Up - no rotation needed
+        break;
+      case 1: // Right
+        ctx.rotate(Math.PI / 2);
+        break;
+      case 2: // Down
+        ctx.rotate(Math.PI);
+        break;
+      case 3: // Left
+        ctx.rotate(-Math.PI / 2);
+        break;
+    }
+
+    // Draw the arrow image centered in the container
+    const offset = (CONTAINER_SIZE - arrowSize) / 2;
+    ctx.drawImage(
+      arrowImage,
+      -arrowSize / 2,
+      -arrowSize / 2,
+      arrowSize,
+      arrowSize
+    );
+
+    // Restore the context state
+    ctx.restore();
+  });
+}
+
+// Add slope effect to ball movement
+function getNextPosition(x, y) {
+  // Check if current position is on a slope
+  const slope = SLOPES.find((s) => s.x === x && s.y === y);
+
+  if (slope) {
+    // Return the next position based on slope direction
+    switch (slope.direction) {
+      case 0: // Up
+        return { x, y: y - 1 };
+      case 1: // Right
+        return { x: x + 1, y };
+      case 2: // Down
+        return { x, y: y + 1 };
+      case 3: // Left
+        return { x: x - 1, y };
+    }
+  }
+
+  return { x, y };
+}
+
+// Remove the original treeImage.onload handler and use this instead
+function setupGame() {
+  let loadedImages = 0;
+  const totalImages = 2; // tree and arrow
+
+  function onImageLoad() {
+    loadedImages++;
+    if (loadedImages === totalImages) {
+      initializeGame();
+      setupCanvas();
+    }
+  }
+
+  treeImage.onload = onImageLoad;
+  arrowImage.onload = onImageLoad;
+}
+
+// Call setupGame instead of setupCanvas directly
+setupGame();
