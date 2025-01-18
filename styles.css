@@ -249,3 +249,23 @@ canvas {
 .menu-item span {
     font-weight: 500;
 }
+
+.menu-items {
+  padding: 1rem;
+}
+
+.menu-item {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f0f0f0;
+}
