@@ -10,7 +10,7 @@ const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
 // Set canvas dimensions based on container size and count
-const CONTAINER_SIZE = 24; // 6px x 6px containers
+let CONTAINER_SIZE = 24; // 6px x 6px containers
 const CONTAINER_WIDTH_COUNT = 16;
 const CONTAINER_HEIGHT_COUNT = 26;
 
@@ -36,7 +36,115 @@ do {
 } while (POND.height === POND.width);
 
 // Add after POND initialization
+function generatePondShape() {
+  const pondMap = Array(POND.height)
+    .fill()
+    .map(() => Array(POND.width).fill(false));
+  const centerX = Math.floor(POND.width / 2);
+  const centerY = Math.floor(POND.height / 2);
+
+  // Generate main pond shape
+  for (let y = 0; y < POND.height; y++) {
+    for (let x = 0; x < POND.width; x++) {
+      // Distance from center
+      const dx = (x - centerX) / POND.width;
+      const dy = (y - centerY) / POND.height;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Random noise factor
+      const noise = Math.random() * 0.3;
+
+      // Create irregular shape with some randomness
+      if (distance + noise < 0.5) {
+        pondMap[y][x] = true;
+      }
+    }
+  }
+
+  // Add some natural variation to edges
+  for (let y = 1; y < POND.height - 1; y++) {
+    for (let x = 1; x < POND.width - 1; x++) {
+      if (pondMap[y][x]) {
+        if (Math.random() < 0.1) {
+          const neighbors = [
+            pondMap[y - 1][x],
+            pondMap[y + 1][x],
+            pondMap[y][x - 1],
+            pondMap[y][x + 1],
+          ];
+          const waterNeighbors = neighbors.filter((n) => n).length;
+          if (waterNeighbors <= 1) {
+            pondMap[y][x] = false;
+          }
+        }
+      }
+    }
+  }
+
+  return pondMap;
+}
+
+// Initialize pond shape
 const pondShape = generatePondShape();
+
+// Then initialize SAND and sandShape
+const SAND = {
+  x: Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 8)),
+  y: Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 8)),
+  width: Math.floor(Math.random() * 5) + 4,
+  height: Math.floor(Math.random() * 5) + 4,
+};
+
+const sandShape = generateSandShape();
+
+// Add after generatePondShape function
+function generateSandShape() {
+  const sandMap = Array(SAND.height)
+    .fill()
+    .map(() => Array(SAND.width).fill(false));
+  const centerX = Math.floor(SAND.width / 2);
+  const centerY = Math.floor(SAND.height / 2);
+
+  // Generate main sand shape
+  for (let y = 0; y < SAND.height; y++) {
+    for (let x = 0; x < SAND.width; x++) {
+      // Distance from center
+      const dx = (x - centerX) / SAND.width;
+      const dy = (y - centerY) / SAND.height;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Random noise factor
+      const noise = Math.random() * 0.3;
+
+      // Create irregular shape with some randomness
+      if (distance + noise < 0.5) {
+        sandMap[y][x] = true;
+      }
+    }
+  }
+
+  // Add some natural variation to edges
+  for (let y = 1; y < SAND.height - 1; y++) {
+    for (let x = 1; x < SAND.width - 1; x++) {
+      if (sandMap[y][x]) {
+        if (Math.random() < 0.1) {
+          const neighbors = [
+            sandMap[y - 1][x],
+            sandMap[y + 1][x],
+            sandMap[y][x - 1],
+            sandMap[y][x + 1],
+          ];
+          const sandNeighbors = neighbors.filter((n) => n).length;
+          if (sandNeighbors <= 1) {
+            sandMap[y][x] = false;
+          }
+        }
+      }
+    }
+  }
+
+  return sandMap;
+}
 
 // Add after other initializations but before any functions
 let treePositions = new Set(); // Store tree positions
@@ -45,6 +153,11 @@ let treePositions = new Set(); // Store tree positions
 function isValidGolfPosition(x, y) {
   // Check if position is inside pond
   if (isInsidePond(x, y)) {
+    return false;
+  }
+
+  // Check if position is inside sand
+  if (isInsideSand(x, y)) {
     return false;
   }
 
@@ -101,11 +214,22 @@ function isInsidePond(x, y) {
   );
 }
 
+// Add after isInsidePond function
+function isInsideSand(x, y) {
+  const localX = x - SAND.x;
+  const localY = y - SAND.y;
+  return (
+    localX >= 0 &&
+    localX < SAND.width &&
+    localY >= 0 &&
+    localY < SAND.height &&
+    sandShape[localY][localX]
+  );
+}
+
 // Wait for image to load before drawing
 treeImage.onload = () => {
-  drawContainers();
-  addRandomTrees();
-  drawGolfElements();
+  setupCanvas();
 };
 
 // Function to draw containers with gray dots
@@ -206,6 +330,103 @@ function drawContainers() {
       ctx.fill();
     }
   }
+
+  // Draw sand tiles with rounded corners
+  ctx.fillStyle = "#FFE4B5"; // Light orange/sand color
+  for (let y = 0; y < SAND.height; y++) {
+    for (let x = 0; x < SAND.width; x++) {
+      if (!sandShape[y][x]) continue;
+
+      const posX = (SAND.x + x) * CONTAINER_SIZE;
+      const posY = (SAND.y + y) * CONTAINER_SIZE;
+
+      ctx.beginPath();
+      const radius = 8;
+
+      // Check adjacent tiles to determine which corners to round
+      const hasTop = y > 0 && sandShape[y - 1][x];
+      const hasBottom = y < SAND.height - 1 && sandShape[y + 1][x];
+      const hasLeft = x > 0 && sandShape[y][x - 1];
+      const hasRight = x < SAND.width - 1 && sandShape[y][x + 1];
+
+      // Draw tile with appropriate rounded corners (same logic as pond)
+      ctx.moveTo(posX + radius, posY);
+
+      // Top right
+      if (!hasTop && !hasRight) {
+        ctx.lineTo(posX + CONTAINER_SIZE - radius, posY);
+        ctx.arcTo(
+          posX + CONTAINER_SIZE,
+          posY,
+          posX + CONTAINER_SIZE,
+          posY + radius,
+          radius
+        );
+      } else {
+        ctx.lineTo(posX + CONTAINER_SIZE, posY);
+      }
+
+      // Bottom right
+      if (!hasBottom && !hasRight) {
+        ctx.lineTo(posX + CONTAINER_SIZE, posY + CONTAINER_SIZE - radius);
+        ctx.arcTo(
+          posX + CONTAINER_SIZE,
+          posY + CONTAINER_SIZE,
+          posX + CONTAINER_SIZE - radius,
+          posY + CONTAINER_SIZE,
+          radius
+        );
+      } else {
+        ctx.lineTo(posX + CONTAINER_SIZE, posY + CONTAINER_SIZE);
+      }
+
+      // Bottom left
+      if (!hasBottom && !hasLeft) {
+        ctx.lineTo(posX + radius, posY + CONTAINER_SIZE);
+        ctx.arcTo(
+          posX,
+          posY + CONTAINER_SIZE,
+          posX,
+          posY + CONTAINER_SIZE - radius,
+          radius
+        );
+      } else {
+        ctx.lineTo(posX, posY + CONTAINER_SIZE);
+      }
+
+      // Top left
+      if (!hasTop && !hasLeft) {
+        ctx.lineTo(posX, posY + radius);
+        ctx.arcTo(posX, posY, posX + radius, posY, radius);
+      } else {
+        ctx.lineTo(posX, posY);
+      }
+
+      ctx.closePath();
+      ctx.fill();
+
+      // Add sand texture dots
+      ctx.fillStyle = "#FFE4B5"; // Darker sand color
+      const dotCount = 6; // Number of dots per tile
+      const dotSize = 1; // Size of dots
+      const padding = CONTAINER_SIZE * 0.2; // Padding from edges
+
+      // Add random dots
+      for (let i = 0; i < dotCount; i++) {
+        const dotX =
+          posX + padding + Math.random() * (CONTAINER_SIZE - 2 * padding);
+        const dotY =
+          posY + padding + Math.random() * (CONTAINER_SIZE - 2 * padding);
+
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Reset fillStyle for next drawing operations
+  ctx.fillStyle = "#FFE4B5";
 }
 
 // Modify addRandomTrees to store positions
@@ -226,7 +447,7 @@ function addRandomTrees() {
     }
   }
 
-  // Draw trees from stored positions
+  // Draw trees from stored positions with crisp rendering
   for (const pos of treePositions) {
     const [x, y] = pos.split(",").map(Number);
     const posX = x * CONTAINER_SIZE;
@@ -237,120 +458,33 @@ function addRandomTrees() {
     const offsetX = (CONTAINER_SIZE - treeSize) / 2;
     const offsetY = (CONTAINER_SIZE - treeSize) / 2;
 
+    // Use crisp pixel values
     ctx.drawImage(
       treeImage,
-      posX + offsetX,
-      posY + offsetY,
-      treeSize,
-      treeSize
+      Math.round(posX + offsetX),
+      Math.round(posY + offsetY),
+      Math.round(treeSize),
+      Math.round(treeSize)
     );
   }
 }
 
-// Add after POND definition
-function generatePondShape() {
-  const pondMap = Array(POND.height)
-    .fill()
-    .map(() => Array(POND.width).fill(false));
-  const centerX = Math.floor(POND.width / 2);
-  const centerY = Math.floor(POND.height / 2);
-
-  // Generate main pond shape
-  for (let y = 0; y < POND.height; y++) {
-    for (let x = 0; x < POND.width; x++) {
-      // Distance from center
-      const dx = (x - centerX) / POND.width;
-      const dy = (y - centerY) / POND.height;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // Random noise factor
-      const noise = Math.random() * 0.3;
-
-      // Create irregular shape with some randomness
-      if (distance + noise < 0.5) {
-        pondMap[y][x] = true;
-      }
-    }
-  }
-
-  // Possibly add a connected secondary pond
-  if (Math.random() < 0.5) {
-    // 50% chance for second pond
-    const secondaryX = centerX + (Math.random() > 0.5 ? 2 : -2); // Offset from main pond
-    const secondaryY = centerY + (Math.random() > 0.5 ? 2 : -2);
-
-    // Create connecting path and secondary pond
-    for (let y = 0; y < POND.height; y++) {
-      for (let x = 0; x < POND.width; x++) {
-        // Distance from secondary center
-        const dx = (x - secondaryX) / (POND.width * 0.7); // Smaller radius
-        const dy = (y - secondaryY) / (POND.height * 0.7);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        // Random noise factor
-        const noise = Math.random() * 0.2;
-
-        // Add to existing pond
-        if (distance + noise < 0.4) {
-          pondMap[y][x] = true;
-        }
-      }
-    }
-
-    // Ensure connection between ponds
-    const pathX = Math.min(centerX, secondaryX);
-    const pathWidth = Math.abs(centerX - secondaryX);
-    const pathY = Math.min(centerY, secondaryY);
-    const pathHeight = Math.abs(centerY - secondaryY);
-
-    for (let y = pathY; y <= pathY + pathHeight; y++) {
-      for (let x = pathX; x <= pathX + pathWidth; x++) {
-        if (y >= 0 && y < POND.height && x >= 0 && x < POND.width) {
-          pondMap[y][x] = true;
-        }
-      }
-    }
-  }
-
-  // Add some natural variation to edges
-  for (let y = 1; y < POND.height - 1; y++) {
-    for (let x = 1; x < POND.width - 1; x++) {
-      if (pondMap[y][x]) {
-        // Randomly smooth or roughen edges
-        if (Math.random() < 0.1) {
-          const neighbors = [
-            pondMap[y - 1][x],
-            pondMap[y + 1][x],
-            pondMap[y][x - 1],
-            pondMap[y][x + 1],
-          ];
-          const waterNeighbors = neighbors.filter((n) => n).length;
-          if (waterNeighbors <= 1) {
-            pondMap[y][x] = false;
-          }
-        }
-      }
-    }
-  }
-
-  return pondMap;
-}
-
 // Add function to draw golf elements
 function drawGolfElements() {
-  // Draw hole (hollow circle)
+  // Draw hole (hollow circle with soft red color)
   const holeX = GOLF.hole.x * CONTAINER_SIZE + CONTAINER_SIZE / 2;
   const holeY = GOLF.hole.y * CONTAINER_SIZE + CONTAINER_SIZE / 2;
 
+  // Draw outer ring with soft red color
   ctx.beginPath();
-  ctx.strokeStyle = "#000000";
+  ctx.strokeStyle = "#ff6b6b"; // Soft red color
   ctx.lineWidth = 3;
   ctx.arc(holeX, holeY, GOLF.hole.size / 2, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Draw inner shadow for hole
+  // Draw inner shadow with reddish tint
   ctx.beginPath();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.fillStyle = "rgba(255, 107, 107, 0.2)"; // Semi-transparent soft red
   ctx.arc(holeX, holeY, GOLF.hole.size / 2 - 2, 0, Math.PI * 2);
   ctx.fill();
 
@@ -374,6 +508,7 @@ let currentDiceValue = 0;
 let movesRemaining = 0;
 let highlightedPositions = new Set(); // Store possible move positions
 let moveHistory = []; // Store all previous moves
+let strokeCount = 0;
 
 // Function to highlight possible moves
 function highlightPossibleMoves() {
@@ -398,7 +533,7 @@ function highlightPossibleMoves() {
     const stepMultiplier =
       Math.abs(dx) + Math.abs(dy) === 2 ? diceValue : diceValue;
 
-    // Calculate final position using full dice value
+    // Calculate final position
     const finalX = GOLF.ball.x + dx * stepMultiplier;
     const finalY = GOLF.ball.y + dy * stepMultiplier;
 
@@ -407,22 +542,31 @@ function highlightPossibleMoves() {
       finalX >= 0 &&
       finalX < CONTAINER_WIDTH_COUNT &&
       finalY >= 0 &&
-      finalY < CONTAINER_HEIGHT_COUNT &&
-      isValidGolfPosition(finalX, finalY)
+      finalY < CONTAINER_HEIGHT_COUNT
     ) {
-      // Check if path is clear
-      let pathIsClear = true;
-      for (let step = 1; step < stepMultiplier; step++) {
-        const checkX = GOLF.ball.x + dx * step;
-        const checkY = GOLF.ball.y + dy * step;
-        if (!isValidGolfPosition(checkX, checkY)) {
-          pathIsClear = false;
-          break;
-        }
-      }
+      // Check if final position is valid (not in pond or tree)
+      const isValidFinal = isValidGolfPosition(finalX, finalY);
+      // Check if final position is in sand
+      const isInSand = isInsideSand(finalX, finalY);
 
-      if (pathIsClear) {
-        highlightedPositions.add(`${finalX},${finalY}`);
+      // For sand tiles, we'll use one less movement point
+      const effectiveDistance = isInSand ? stepMultiplier + 1 : stepMultiplier;
+
+      if (isValidFinal && effectiveDistance <= diceValue) {
+        // Check if path is clear
+        let pathIsClear = true;
+        for (let step = 1; step < stepMultiplier; step++) {
+          const checkX = GOLF.ball.x + dx * step;
+          const checkY = GOLF.ball.y + dy * step;
+          if (!isValidGolfPosition(checkX, checkY)) {
+            pathIsClear = false;
+            break;
+          }
+        }
+
+        if (pathIsClear) {
+          highlightedPositions.add(`${finalX},${finalY}`);
+        }
       }
     }
   }
@@ -430,10 +574,15 @@ function highlightPossibleMoves() {
   // Redraw with highlights
   drawContainers();
   addRandomTrees();
-  // Add highlights
-  ctx.fillStyle = "rgba(255, 255, 0, 0.3)"; // Semi-transparent yellow
+
+  // Add highlights with different colors for sand
   for (const pos of highlightedPositions) {
     const [x, y] = pos.split(",").map(Number);
+    if (isInsideSand(x, y)) {
+      ctx.fillStyle = "rgba(255, 165, 0, 0.3)"; // Semi-transparent orange for sand
+    } else {
+      ctx.fillStyle = "rgba(255, 255, 0, 0.3)"; // Semi-transparent yellow for normal
+    }
     ctx.fillRect(
       x * CONTAINER_SIZE,
       y * CONTAINER_SIZE,
@@ -441,13 +590,44 @@ function highlightPossibleMoves() {
       CONTAINER_SIZE
     );
   }
+
   drawGolfElements();
+
+  // After checking all possible moves, check if any are valid
+  checkForValidMoves();
+}
+
+// Add this function after highlightPossibleMoves
+function checkForValidMoves() {
+  // If no highlighted positions after calculating moves
+  if (highlightedPositions.size === 0 && currentDiceValue > 0) {
+    // Add shake class
+    diceResult.classList.add("shake");
+
+    // Remove shake class after animation completes
+    setTimeout(() => {
+      diceResult.classList.remove("shake");
+
+      // Reset dice after a short delay
+      setTimeout(() => {
+        currentDiceValue = 0;
+        diceResult.textContent = "?";
+        diceButton.disabled = false;
+        movesRemaining = 0;
+        document.getElementById("movesLeft").textContent = movesRemaining;
+      }, 300);
+    }, 500);
+
+    return false;
+  }
+  return true;
 }
 
 // Modify dice roll handler
 diceButton.addEventListener("click", () => {
   diceButton.disabled = true;
-  highlightedPositions.clear(); // Clear old highlights
+  highlightedPositions.clear();
+  diceResult.classList.remove("shake"); // Reset shake class
 
   let rolls = 0;
   const maxRolls = 10;
@@ -458,11 +638,10 @@ diceButton.addEventListener("click", () => {
 
     if (rolls >= maxRolls) {
       clearInterval(rollInterval);
-      diceButton.disabled = false;
       currentDiceValue = rollValue;
       movesRemaining = rollValue;
       document.getElementById("movesLeft").textContent = movesRemaining;
-      highlightPossibleMoves(); // Add highlights after roll
+      highlightPossibleMoves(); // This will now check for valid moves
     }
   }, 100);
 });
@@ -475,8 +654,22 @@ canvas.addEventListener("click", (event) => {
   if (movesRemaining <= 0) return;
 
   const rect = canvas.getBoundingClientRect();
-  const clickX = Math.floor((event.clientX - rect.left) / CONTAINER_SIZE);
-  const clickY = Math.floor((event.clientY - rect.top) / CONTAINER_SIZE);
+
+  // Calculate the scaling factor between displayed size and actual canvas size
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  // Calculate click position relative to the canvas
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+
+  // Convert to container coordinates
+  const clickX = Math.floor(
+    (x * scaleX) / (CONTAINER_SIZE * (window.devicePixelRatio || 1))
+  );
+  const clickY = Math.floor(
+    (y * scaleY) / (CONTAINER_SIZE * (window.devicePixelRatio || 1))
+  );
 
   // Check if clicked position is highlighted
   if (highlightedPositions.has(`${clickX},${clickY}`)) {
@@ -584,27 +777,42 @@ canvas.addEventListener("click", (event) => {
         drawHistoricalPath(move);
       }
 
+      // Draw the hole first (so ball appears on top)
+      const holeX = GOLF.hole.x * CONTAINER_SIZE + CONTAINER_SIZE / 2;
+      const holeY = GOLF.hole.y * CONTAINER_SIZE + CONTAINER_SIZE / 2;
+
+      ctx.beginPath();
+      ctx.strokeStyle = "#ff6b6b";
+      ctx.lineWidth = 3;
+      ctx.arc(holeX, holeY, GOLF.hole.size / 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255, 107, 107, 0.2)";
+      ctx.arc(holeX, holeY, GOLF.hole.size / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+
       // Draw current movement path with smoother line
       ctx.beginPath();
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
       ctx.lineWidth = 2;
-      ctx.lineCap = "round"; // Add rounded line caps
-      ctx.lineJoin = "round"; // Add rounded line joins
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.moveTo(startX, startY);
       ctx.lineTo(lerp(startX, endX, progress), lerp(startY, endY, progress));
       ctx.stroke();
 
-      // Draw ball at interpolated position with anti-aliasing
+      // Draw ball at interpolated position
       const currentX = lerp(startX, endX, progress);
       const currentY = lerp(startY, endY, progress);
 
       ctx.beginPath();
       ctx.fillStyle = "#000000";
-      ctx.shadowBlur = 1; // Add slight shadow for smoother appearance
+      ctx.shadowBlur = 1;
       ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
       ctx.arc(currentX, currentY, GOLF.ball.size / 2, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0; // Reset shadow
+      ctx.shadowBlur = 0;
 
       // Color the path based on movement type
       const isMoveDiagonal = Math.abs(dx) === Math.abs(dy);
@@ -629,11 +837,23 @@ canvas.addEventListener("click", (event) => {
         GOLF.ball.x = clickX;
         GOLF.ball.y = clickY;
 
-        // Final cleanup
-        movesRemaining--;
-        document.getElementById("movesLeft").textContent = movesRemaining;
-        highlightedPositions.clear();
-        currentDiceValue = 0;
+        // Update stroke count
+        strokeCount++;
+        document.getElementById("movesLeft").textContent = strokeCount;
+
+        // Check if game is complete
+        const gameComplete = checkGameComplete(clickX, clickY);
+
+        if (!gameComplete) {
+          // Only continue game if not complete
+          movesRemaining--;
+          highlightedPositions.clear();
+          currentDiceValue = 0;
+          diceButton.disabled = false;
+        } else {
+          // Disable dice button if game complete
+          diceButton.disabled = true;
+        }
 
         // Store this move in history
         moveHistory.push({
@@ -735,10 +955,8 @@ const refreshButton = document.getElementById("refreshButton");
 
 // Add this with your other event listeners
 refreshButton.addEventListener("click", () => {
-  // Reset game state
-  initializeGame(); // Assuming you have this function that sets up a new game
-  movesLeft = 0;
-  document.getElementById("movesLeft").textContent = movesLeft;
+  initializeGame();
+  diceButton.disabled = false;
   diceResult.textContent = "?";
 });
 
@@ -779,9 +997,286 @@ function initializeGame() {
     Math.abs(GOLF.ball.y - GOLF.hole.y) < 5
   );
 
+  // Generate new sand position
+  SAND.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 8));
+  SAND.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 8));
+  SAND.width = Math.floor(Math.random() * 5) + 4;
+  SAND.height = Math.floor(Math.random() * 5) + 4;
+
+  // Generate new sand shape
+  const newSandShape = generateSandShape();
+  Object.assign(sandShape, newSandShape);
+
   // Redraw everything
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawContainers();
   addRandomTrees();
   drawGolfElements();
+
+  // Reset stroke count
+  strokeCount = 0;
+  document.getElementById("movesLeft").textContent = strokeCount;
+}
+
+// Modify the setupCanvas function
+function setupCanvas() {
+  // Get the container width
+  const container = canvas.parentElement;
+  const containerWidth = container.clientWidth - 40; // Account for padding
+
+  // Get device pixel ratio
+  const dpr = window.devicePixelRatio || 1;
+
+  // Calculate the best size that maintains aspect ratio
+  const aspectRatio = CONTAINER_HEIGHT_COUNT / CONTAINER_WIDTH_COUNT;
+
+  // Set canvas size based on container width
+  const baseSize = Math.min(containerWidth / CONTAINER_WIDTH_COUNT, 24);
+
+  // Update container size
+  CONTAINER_SIZE = baseSize;
+
+  // Set canvas dimensions accounting for device pixel ratio
+  const logicalWidth = CONTAINER_SIZE * CONTAINER_WIDTH_COUNT;
+  const logicalHeight = CONTAINER_SIZE * CONTAINER_HEIGHT_COUNT;
+
+  // Set the canvas size in CSS pixels
+  canvas.style.width = `${logicalWidth}px`;
+  canvas.style.height = `${logicalHeight}px`;
+
+  // Scale the canvas for high DPI displays
+  canvas.width = Math.floor(logicalWidth * dpr);
+  canvas.height = Math.floor(logicalHeight * dpr);
+
+  // Reset the context state
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Scale the context to handle the device pixel ratio
+  ctx.scale(dpr, dpr);
+
+  // Enable image smoothing for better quality
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // Store the current scale for click handling
+  canvas.currentScale = dpr;
+
+  // Redraw everything
+  drawContainers();
+  addRandomTrees();
+  drawGolfElements();
+}
+
+// Add resize handler
+window.addEventListener("resize", debounce(setupCanvas, 250));
+
+// Add debounce function to prevent too many resize events
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Call setupCanvas instead of direct dimension setting
+setupCanvas();
+
+// Add near the top with other DOM element selections
+const menuButton = document.getElementById("menuButton");
+const menuOverlay = document.getElementById("menuOverlay");
+const sideMenu = document.getElementById("sideMenu");
+const closeMenu = document.getElementById("closeMenu");
+
+// Add menu event listeners
+menuButton.addEventListener("click", () => {
+  menuOverlay.classList.add("active");
+  sideMenu.classList.add("active");
+});
+
+closeMenu.addEventListener("click", closeMenuFunction);
+menuOverlay.addEventListener("click", closeMenuFunction);
+
+function closeMenuFunction() {
+  menuOverlay.classList.remove("active");
+  sideMenu.classList.remove("active");
+}
+
+// Add keyboard event listener for Escape key
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && menuOverlay.classList.contains("active")) {
+    closeMenuFunction();
+  }
+});
+
+// Add after other initializations
+function showGameCompletePopup() {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+  overlay.style.display = "flex";
+  overlay.style.justifyContent = "center";
+  overlay.style.alignItems = "center";
+  overlay.style.zIndex = "1000";
+
+  const popup = document.createElement("div");
+  popup.style.backgroundColor = "white";
+  popup.style.padding = "2rem";
+  popup.style.borderRadius = "1rem";
+  popup.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+  popup.style.textAlign = "center";
+
+  const message = document.createElement("h2");
+  message.textContent = `Hole in ${strokeCount} strokes!`;
+  message.style.marginBottom = "1rem";
+  message.style.color = "#333";
+
+  const playAgainButton = document.createElement("button");
+  playAgainButton.textContent = "Play Again";
+  playAgainButton.style.padding = "0.5rem 1rem";
+  playAgainButton.style.fontSize = "1rem";
+  playAgainButton.style.backgroundColor = "#4CAF50";
+  playAgainButton.style.color = "white";
+  playAgainButton.style.border = "none";
+  playAgainButton.style.borderRadius = "0.5rem";
+  playAgainButton.style.cursor = "pointer";
+  playAgainButton.style.marginTop = "1rem";
+
+  playAgainButton.addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    initializeGame();
+    diceButton.disabled = false;
+    diceResult.textContent = "?";
+    strokeCount = 0;
+    document.getElementById("movesLeft").textContent = strokeCount;
+  });
+
+  popup.appendChild(message);
+  popup.appendChild(playAgainButton);
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+}
+
+// Add function to check if ball has reached hole
+function checkGameComplete(ballX, ballY) {
+  if (ballX === GOLF.hole.x && ballY === GOLF.hole.y) {
+    setTimeout(() => {
+      showGameCompletePopup();
+    }, 500); // Show popup after animation completes
+    return true;
+  }
+  return false;
+}
+
+// Add after other popup-related functions
+function showRulesPopup() {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+  overlay.style.display = "flex";
+  overlay.style.justifyContent = "center";
+  overlay.style.alignItems = "center";
+  overlay.style.zIndex = "1000";
+
+  const popup = document.createElement("div");
+  popup.style.backgroundColor = "white";
+  popup.style.padding = "2rem";
+  popup.style.borderRadius = "1rem";
+  popup.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+  popup.style.maxWidth = "80%";
+  popup.style.maxHeight = "80vh";
+  popup.style.overflowY = "auto";
+
+  const title = document.createElement("h2");
+  title.textContent = "How to Play";
+  title.style.marginBottom = "1.5rem";
+  title.style.color = "#333";
+  title.style.borderBottom = "2px solid #eee";
+  title.style.paddingBottom = "0.5rem";
+
+  const rulesList = document.createElement("div");
+  rulesList.style.textAlign = "left";
+  rulesList.style.lineHeight = "1.6";
+
+  const rules = [
+    {
+      title: "Objective",
+      text: "Get the black ball into the hole in as few strokes as possible.",
+    },
+    {
+      title: "Controls",
+      text: "1. Roll the dice to determine how far you can move\n2. Click on a highlighted square to move the ball",
+    },
+    {
+      title: "Movement",
+      text: "• Move straight or diagonally up to the dice value\n• Path must be clear of obstacles",
+    },
+    {
+      title: "Obstacles",
+      text: "🌲 Trees: Cannot move through or land on trees\n💧 Water: Cannot move through or land on water\n🏖️ Sand: Requires one extra movement point to land on",
+    },
+    {
+      title: "Scoring",
+      text: "Each dice roll counts as one stroke. Try to complete the hole in as few strokes as possible!",
+    },
+  ];
+
+  rules.forEach((rule) => {
+    const ruleSection = document.createElement("div");
+    ruleSection.style.marginBottom = "1.5rem";
+
+    const ruleTitle = document.createElement("h3");
+    ruleTitle.textContent = rule.title;
+    ruleTitle.style.color = "#444";
+    ruleTitle.style.marginBottom = "0.5rem";
+
+    const ruleText = document.createElement("p");
+    ruleText.style.color = "#666";
+    ruleText.style.whiteSpace = "pre-line";
+    ruleText.textContent = rule.text;
+
+    ruleSection.appendChild(ruleTitle);
+    ruleSection.appendChild(ruleText);
+    rulesList.appendChild(ruleSection);
+  });
+
+  const closeButton = document.createElement("button");
+  closeButton.textContent = "Got it!";
+  closeButton.style.padding = "0.5rem 1rem";
+  closeButton.style.fontSize = "1rem";
+  closeButton.style.backgroundColor = "#4CAF50";
+  closeButton.style.color = "white";
+  closeButton.style.border = "none";
+  closeButton.style.borderRadius = "0.5rem";
+  closeButton.style.cursor = "pointer";
+  closeButton.style.marginTop = "1rem";
+
+  closeButton.addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    closeMenuFunction(); // Close the menu when rules are closed
+  });
+
+  popup.appendChild(title);
+  popup.appendChild(rulesList);
+  popup.appendChild(closeButton);
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+}
+
+// Modify the event listener addition to check for element existence
+const howToPlayButton = document.getElementById("howToPlay");
+if (howToPlayButton) {
+  howToPlayButton.addEventListener("click", showRulesPopup);
 }

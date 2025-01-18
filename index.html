@@ -13,9 +13,31 @@
     />
   </head>
   <body>
+    <div class="menu-overlay" id="menuOverlay"></div>
+    <div class="side-menu" id="sideMenu">
+      <div class="menu-header">
+        <h2>Menu</h2>
+        <button class="close-menu" id="closeMenu">×</button>
+      </div>
+      <div class="menu-content">
+        <div>
+          Made by
+          <a target="_blank" href="https://x.com/heyarviind">@heyarviind</a>
+        </div>
+        <button class="menu-item" id="howToPlay">
+          <span>❓ How to Play</span>
+        </button>
+      </div>
+    </div>
     <div class="header">
       <div>
-        <img src="icons/hamburger.svg" width="28px" alt="hamburger" />
+        <img
+          src="icons/hamburger.svg"
+          width="28px"
+          alt="hamburger"
+          id="menuButton"
+          style="cursor: pointer"
+        />
       </div>
       <div class="moves-left">Strokes: <span id="movesLeft">0</span></div>
       <div>
