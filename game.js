@@ -20,29 +20,37 @@ canvas.height = CONTAINER_SIZE * CONTAINER_HEIGHT_COUNT; // 216px
 
 // Create and load tree image
 const treeImage = new Image();
-treeImage.src = "icons/tree.svg";
-
-// Add near the top with other image loading
 const arrowImage = new Image();
-arrowImage.src = "icons/arrow-up.svg";
+const fireImage = new Image();
 
-// Wait for both images to load before initializing
+// Add load event listeners before setting src
+treeImage.onload = onImageLoad;
+arrowImage.onload = onImageLoad;
+fireImage.onload = onImageLoad;
+
+// Then set the image sources
+treeImage.src = "icons/tree.svg";
+arrowImage.src = "icons/arrow-up.svg";
+fireImage.src = "icons/fire.svg";
+
+// Update the image loading counter
 let imagesLoaded = 0;
-const requiredImages = 2; // tree and arrow
+const requiredImages = 3; // tree, arrow, and fire
 
 function onImageLoad() {
   imagesLoaded++;
   if (imagesLoaded === requiredImages) {
     setupCanvas();
-    generateSlopes(); // Generate initial slopes
+    generateSlopes();
   }
 }
 
-treeImage.onload = onImageLoad;
-arrowImage.onload = onImageLoad;
-
 // Initialize game objects
 const SLOPES = []; // Store slope positions and directions
+const FIRE = {
+  x: 0,
+  y: 0,
+};
 
 // Add after canvas dimensions setup and before image loading
 const POND = {
@@ -173,22 +181,15 @@ let treePositions = new Set(); // Store tree positions
 
 // Add after pondShape initialization
 function isValidGolfPosition(x, y) {
-  // Check if position is inside pond
-  if (isInsidePond(x, y)) {
-    return false;
-  }
-
-  // Check if position is inside sand
-  if (isInsideSand(x, y)) {
-    return false;
-  }
-
-  // Check if position has a tree
-  if (treePositions.has(`${x},${y}`)) {
-    return false;
-  }
-
-  return true;
+  return (
+    x >= 0 &&
+    x < CONTAINER_WIDTH_COUNT &&
+    y >= 0 &&
+    y < CONTAINER_HEIGHT_COUNT &&
+    !isInsidePond(x, y) &&
+    !treePositions.has(`${x},${y}`) &&
+    !isFirePosition(x, y)
+  );
 }
 
 // Modify GOLF initialization to use valid positions
@@ -452,7 +453,10 @@ function drawContainers() {
     drawSlopes();
   }
 
-  // Draw trees last so they appear on top
+  // Draw fire before trees
+  drawFire();
+
+  // Draw trees last
   addRandomTrees();
 
   // Reset fillStyle for next operations
@@ -585,7 +589,7 @@ function highlightPossibleMoves() {
       if (isValidFinal && effectiveDistance <= diceValue) {
         // Check if path is clear
         let pathIsClear = true;
-        for (let step = 1; step < stepMultiplier; step++) {
+        for (let step = 1; step <= stepMultiplier; step++) {
           const checkX = GOLF.ball.x + dx * step;
           const checkY = GOLF.ball.y + dy * step;
           if (!isValidGolfPosition(checkX, checkY)) {
@@ -791,6 +795,15 @@ canvas.addEventListener("click", (event) => {
     // Animate the movement
     const ANIMATION_DURATION = 1200; // Increased from 500 to 800ms for smoother movement
     const startTime = Date.now();
+
+    // Check if path crosses fire
+    let crossesFire = false;
+    for (const step of moveSteps) {
+      if (isFirePosition(step.x, step.y)) {
+        crossesFire = true;
+        break;
+      }
+    }
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -1047,6 +1060,8 @@ function initializeGame() {
 
   // Generate new slopes
   generateSlopes();
+
+  generateFirePosition();
 
   // Redraw everything
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1447,7 +1462,7 @@ function getNextPosition(x, y) {
 // Remove the original treeImage.onload handler and use this instead
 function setupGame() {
   let loadedImages = 0;
-  const totalImages = 2; // tree and arrow
+  const totalImages = 3; // tree, arrow, and fire
 
   function onImageLoad() {
     loadedImages++;
@@ -1459,7 +1474,108 @@ function setupGame() {
 
   treeImage.onload = onImageLoad;
   arrowImage.onload = onImageLoad;
+  fireImage.onload = onImageLoad;
 }
 
 // Call setupGame instead of setupCanvas directly
 setupGame();
+
+// Add function to generate fire position
+function generateFirePosition() {
+  let isValidPosition = false;
+  while (!isValidPosition) {
+    FIRE.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 2)) + 1;
+    FIRE.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 2)) + 1;
+
+    // Check if position is valid (not on other objects or ball/hole)
+    if (
+      !isInsidePond(FIRE.x, FIRE.y) &&
+      !isInsideSand(FIRE.x, FIRE.y) &&
+      !treePositions.has(`${FIRE.x},${FIRE.y}`) &&
+      !SLOPES.some((slope) => slope.x === FIRE.x && slope.y === FIRE.y) &&
+      !(FIRE.x === GOLF.ball.x && FIRE.y === GOLF.ball.y) &&
+      !(FIRE.x === GOLF.hole.x && FIRE.y === GOLF.hole.y)
+    ) {
+      isValidPosition = true;
+    }
+  }
+}
+
+// Add function to draw fire
+function drawFire() {
+  const fireSize = CONTAINER_SIZE * 0.9;
+  const posX = FIRE.x * CONTAINER_SIZE + (CONTAINER_SIZE - fireSize) / 2;
+  const posY = FIRE.y * CONTAINER_SIZE + (CONTAINER_SIZE - fireSize) / 2;
+
+  // Add a subtle glow effect
+  ctx.save();
+  ctx.shadowColor = "rgba(255, 68, 68, 0.5)";
+  ctx.shadowBlur = 10;
+
+  // Draw the fire image
+  ctx.drawImage(fireImage, posX, posY, fireSize, fireSize);
+
+  ctx.restore();
+}
+
+// Add game over popup function
+function showGameOverPopup() {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+  overlay.style.display = "flex";
+  overlay.style.justifyContent = "center";
+  overlay.style.alignItems = "center";
+  overlay.style.zIndex = "1000";
+
+  const popup = document.createElement("div");
+  popup.style.backgroundColor = "white";
+  popup.style.padding = "2rem";
+  popup.style.borderRadius = "1rem";
+  popup.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+  popup.style.textAlign = "center";
+
+  const message = document.createElement("h2");
+  message.textContent = "Game Over!";
+  message.style.marginBottom = "1rem";
+  message.style.color = "#ff4444";
+
+  const subMessage = document.createElement("p");
+  subMessage.textContent = "Your ball hit the fire!";
+  subMessage.style.marginBottom = "1.5rem";
+  subMessage.style.color = "#666";
+
+  const playAgainButton = document.createElement("button");
+  playAgainButton.textContent = "Play Again";
+  playAgainButton.style.padding = "0.5rem 1rem";
+  playAgainButton.style.fontSize = "1rem";
+  playAgainButton.style.backgroundColor = "#4CAF50";
+  playAgainButton.style.color = "white";
+  playAgainButton.style.border = "none";
+  playAgainButton.style.borderRadius = "0.5rem";
+  playAgainButton.style.cursor = "pointer";
+
+  playAgainButton.addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    initializeGame();
+    diceButton.disabled = false;
+    diceResult.textContent = "?";
+    strokeCount = 0;
+    document.getElementById("movesLeft").textContent = strokeCount;
+  });
+
+  popup.appendChild(message);
+  popup.appendChild(subMessage);
+  popup.appendChild(playAgainButton);
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+}
+
+// Add function to check if a position intersects with fire
+function isFirePosition(x, y) {
+  return x === FIRE.x && y === FIRE.y;
+}
