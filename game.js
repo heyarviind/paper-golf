@@ -447,7 +447,7 @@ function addRandomTrees() {
     }
   }
 
-  // Draw trees from stored positions
+  // Draw trees from stored positions with crisp rendering
   for (const pos of treePositions) {
     const [x, y] = pos.split(",").map(Number);
     const posX = x * CONTAINER_SIZE;
@@ -458,12 +458,13 @@ function addRandomTrees() {
     const offsetX = (CONTAINER_SIZE - treeSize) / 2;
     const offsetY = (CONTAINER_SIZE - treeSize) / 2;
 
+    // Use crisp pixel values
     ctx.drawImage(
       treeImage,
-      posX + offsetX,
-      posY + offsetY,
-      treeSize,
-      treeSize
+      Math.round(posX + offsetX),
+      Math.round(posY + offsetY),
+      Math.round(treeSize),
+      Math.round(treeSize)
     );
   }
 }
@@ -637,8 +638,22 @@ canvas.addEventListener("click", (event) => {
   if (movesRemaining <= 0) return;
 
   const rect = canvas.getBoundingClientRect();
-  const clickX = Math.floor((event.clientX - rect.left) / CONTAINER_SIZE);
-  const clickY = Math.floor((event.clientY - rect.top) / CONTAINER_SIZE);
+
+  // Calculate the scaling factor between displayed size and actual canvas size
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  // Calculate click position relative to the canvas
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+
+  // Convert to container coordinates
+  const clickX = Math.floor(
+    (x * scaleX) / (CONTAINER_SIZE * (window.devicePixelRatio || 1))
+  );
+  const clickY = Math.floor(
+    (y * scaleY) / (CONTAINER_SIZE * (window.devicePixelRatio || 1))
+  );
 
   // Check if clicked position is highlighted
   if (highlightedPositions.has(`${clickX},${clickY}`)) {
@@ -966,11 +981,14 @@ function initializeGame() {
   document.getElementById("movesLeft").textContent = strokeCount;
 }
 
-// Replace the existing canvas dimension setup with this code
+// Modify the setupCanvas function
 function setupCanvas() {
   // Get the container width
   const container = canvas.parentElement;
   const containerWidth = container.clientWidth - 40; // Account for padding
+
+  // Get device pixel ratio
+  const dpr = window.devicePixelRatio || 1;
 
   // Calculate the best size that maintains aspect ratio
   const aspectRatio = CONTAINER_HEIGHT_COUNT / CONTAINER_WIDTH_COUNT;
@@ -981,13 +999,30 @@ function setupCanvas() {
   // Update container size
   CONTAINER_SIZE = baseSize;
 
-  // Set canvas dimensions
-  canvas.width = CONTAINER_SIZE * CONTAINER_WIDTH_COUNT;
-  canvas.height = CONTAINER_SIZE * CONTAINER_HEIGHT_COUNT;
+  // Set canvas dimensions accounting for device pixel ratio
+  const logicalWidth = CONTAINER_SIZE * CONTAINER_WIDTH_COUNT;
+  const logicalHeight = CONTAINER_SIZE * CONTAINER_HEIGHT_COUNT;
 
-  // Set canvas CSS size
-  canvas.style.width = `${canvas.width}px`;
-  canvas.style.height = `${canvas.height}px`;
+  // Set the canvas size in CSS pixels
+  canvas.style.width = `${logicalWidth}px`;
+  canvas.style.height = `${logicalHeight}px`;
+
+  // Scale the canvas for high DPI displays
+  canvas.width = Math.floor(logicalWidth * dpr);
+  canvas.height = Math.floor(logicalHeight * dpr);
+
+  // Reset the context state
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Scale the context to handle the device pixel ratio
+  ctx.scale(dpr, dpr);
+
+  // Enable image smoothing for better quality
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // Store the current scale for click handling
+  canvas.currentScale = dpr;
 
   // Redraw everything
   drawContainers();
