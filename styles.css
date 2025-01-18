@@ -1,10 +1,12 @@
 body {
     display: flex;
     flex-direction: column;
-    /* padding: 20px; */
-    gap: 20px;
-    justify-content: center;
-    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: "Outfit", serif;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
 html, body {
@@ -32,23 +34,30 @@ html, body {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    padding: 10px 0;
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 10;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05),
+                0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .header div {
-    padding: 20px;
+    padding: 10px 15px;
 }
 
 .game-container {
     flex: 1;
-    z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 100%;
     max-width: 600px;
-    padding: 0 20px;
+    padding: 10px;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 .dice-container {
@@ -56,8 +65,14 @@ html, body {
     gap: 16px;
     align-items: center;
     justify-content: center;
-    margin-top: 20px;
-    font-family: 'Outfit', sans-serif;
+    padding: 15px;
+    background-color: white;
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05),
+                0 -1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .game-header-info {
@@ -73,12 +88,13 @@ html, body {
     border: none;
     border-radius: 8px;
     padding: 12px 24px;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s;
     font-family: 'Outfit', sans-serif;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-width: 100px;
 }
 
 .dice-button:hover {
@@ -101,36 +117,43 @@ html, body {
     padding: 12px 24px;
     font-size: 24px;
     font-weight: 700;
-    min-width: 32px;
+    min-width: 40px;
     text-align: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     color: #333;
 }
 
 canvas {
-    width: 100% !important;
-    height: auto !important;
-    max-height: 70vh;
-    object-fit: contain;
+    max-width: 100%;
+    height: auto;
+    display: block;
 }
 
 @media (max-width: 480px) {
-    .header div {
-        padding: 12px;
+    .header {
+        padding: 5px 0;
     }
 
-    .moves-left {
-        font-size: 18px;
+    .header div {
+        padding: 8px 12px;
+    }
+
+    .dice-container {
+        padding: 10px;
     }
 
     .dice-button {
         padding: 10px 20px;
-        font-size: 16px;
+        font-size: 14px;
+        min-width: 80px;
     }
 
     .dice-result {
-        padding: 10px 20px;
         font-size: 20px;
+    }
+
+    .moves-left {
+        font-size: 18px;
     }
 }
 
