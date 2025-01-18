@@ -471,19 +471,20 @@ function addRandomTrees() {
 
 // Add function to draw golf elements
 function drawGolfElements() {
-  // Draw hole (hollow circle)
+  // Draw hole (hollow circle with soft red color)
   const holeX = GOLF.hole.x * CONTAINER_SIZE + CONTAINER_SIZE / 2;
   const holeY = GOLF.hole.y * CONTAINER_SIZE + CONTAINER_SIZE / 2;
 
+  // Draw outer ring with soft red color
   ctx.beginPath();
-  ctx.strokeStyle = "#000000";
+  ctx.strokeStyle = "#ff6b6b"; // Soft red color
   ctx.lineWidth = 3;
   ctx.arc(holeX, holeY, GOLF.hole.size / 2, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Draw inner shadow for hole
+  // Draw inner shadow with reddish tint
   ctx.beginPath();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.fillStyle = "rgba(255, 107, 107, 0.2)"; // Semi-transparent soft red
   ctx.arc(holeX, holeY, GOLF.hole.size / 2 - 2, 0, Math.PI * 2);
   ctx.fill();
 
@@ -532,7 +533,7 @@ function highlightPossibleMoves() {
     const stepMultiplier =
       Math.abs(dx) + Math.abs(dy) === 2 ? diceValue : diceValue;
 
-    // Calculate final position using full dice value
+    // Calculate final position
     const finalX = GOLF.ball.x + dx * stepMultiplier;
     const finalY = GOLF.ball.y + dy * stepMultiplier;
 
@@ -541,22 +542,31 @@ function highlightPossibleMoves() {
       finalX >= 0 &&
       finalX < CONTAINER_WIDTH_COUNT &&
       finalY >= 0 &&
-      finalY < CONTAINER_HEIGHT_COUNT &&
-      isValidGolfPosition(finalX, finalY)
+      finalY < CONTAINER_HEIGHT_COUNT
     ) {
-      // Check if path is clear
-      let pathIsClear = true;
-      for (let step = 1; step < stepMultiplier; step++) {
-        const checkX = GOLF.ball.x + dx * step;
-        const checkY = GOLF.ball.y + dy * step;
-        if (!isValidGolfPosition(checkX, checkY)) {
-          pathIsClear = false;
-          break;
-        }
-      }
+      // Check if final position is valid (not in pond or tree)
+      const isValidFinal = isValidGolfPosition(finalX, finalY);
+      // Check if final position is in sand
+      const isInSand = isInsideSand(finalX, finalY);
 
-      if (pathIsClear) {
-        highlightedPositions.add(`${finalX},${finalY}`);
+      // For sand tiles, we'll use one less movement point
+      const effectiveDistance = isInSand ? stepMultiplier + 1 : stepMultiplier;
+
+      if (isValidFinal && effectiveDistance <= diceValue) {
+        // Check if path is clear
+        let pathIsClear = true;
+        for (let step = 1; step < stepMultiplier; step++) {
+          const checkX = GOLF.ball.x + dx * step;
+          const checkY = GOLF.ball.y + dy * step;
+          if (!isValidGolfPosition(checkX, checkY)) {
+            pathIsClear = false;
+            break;
+          }
+        }
+
+        if (pathIsClear) {
+          highlightedPositions.add(`${finalX},${finalY}`);
+        }
       }
     }
   }
@@ -564,10 +574,15 @@ function highlightPossibleMoves() {
   // Redraw with highlights
   drawContainers();
   addRandomTrees();
-  // Add highlights
-  ctx.fillStyle = "rgba(255, 255, 0, 0.3)"; // Semi-transparent yellow
+
+  // Add highlights with different colors for sand
   for (const pos of highlightedPositions) {
     const [x, y] = pos.split(",").map(Number);
+    if (isInsideSand(x, y)) {
+      ctx.fillStyle = "rgba(255, 165, 0, 0.3)"; // Semi-transparent orange for sand
+    } else {
+      ctx.fillStyle = "rgba(255, 255, 0, 0.3)"; // Semi-transparent yellow for normal
+    }
     ctx.fillRect(
       x * CONTAINER_SIZE,
       y * CONTAINER_SIZE,
@@ -575,6 +590,7 @@ function highlightPossibleMoves() {
       CONTAINER_SIZE
     );
   }
+
   drawGolfElements();
 
   // After checking all possible moves, check if any are valid
@@ -761,27 +777,42 @@ canvas.addEventListener("click", (event) => {
         drawHistoricalPath(move);
       }
 
+      // Draw the hole first (so ball appears on top)
+      const holeX = GOLF.hole.x * CONTAINER_SIZE + CONTAINER_SIZE / 2;
+      const holeY = GOLF.hole.y * CONTAINER_SIZE + CONTAINER_SIZE / 2;
+
+      ctx.beginPath();
+      ctx.strokeStyle = "#ff6b6b";
+      ctx.lineWidth = 3;
+      ctx.arc(holeX, holeY, GOLF.hole.size / 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255, 107, 107, 0.2)";
+      ctx.arc(holeX, holeY, GOLF.hole.size / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+
       // Draw current movement path with smoother line
       ctx.beginPath();
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
       ctx.lineWidth = 2;
-      ctx.lineCap = "round"; // Add rounded line caps
-      ctx.lineJoin = "round"; // Add rounded line joins
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.moveTo(startX, startY);
       ctx.lineTo(lerp(startX, endX, progress), lerp(startY, endY, progress));
       ctx.stroke();
 
-      // Draw ball at interpolated position with anti-aliasing
+      // Draw ball at interpolated position
       const currentX = lerp(startX, endX, progress);
       const currentY = lerp(startY, endY, progress);
 
       ctx.beginPath();
       ctx.fillStyle = "#000000";
-      ctx.shadowBlur = 1; // Add slight shadow for smoother appearance
+      ctx.shadowBlur = 1;
       ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
       ctx.arc(currentX, currentY, GOLF.ball.size / 2, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0; // Reset shadow
+      ctx.shadowBlur = 0;
 
       // Color the path based on movement type
       const isMoveDiagonal = Math.abs(dx) === Math.abs(dy);
@@ -806,17 +837,23 @@ canvas.addEventListener("click", (event) => {
         GOLF.ball.x = clickX;
         GOLF.ball.y = clickY;
 
-        // Update stroke count instead of moves remaining
+        // Update stroke count
         strokeCount++;
         document.getElementById("movesLeft").textContent = strokeCount;
 
-        // Rest of cleanup
-        movesRemaining--;
-        highlightedPositions.clear();
-        currentDiceValue = 0;
+        // Check if game is complete
+        const gameComplete = checkGameComplete(clickX, clickY);
 
-        // Re-enable dice button after move is complete
-        diceButton.disabled = false;
+        if (!gameComplete) {
+          // Only continue game if not complete
+          movesRemaining--;
+          highlightedPositions.clear();
+          currentDiceValue = 0;
+          diceButton.disabled = false;
+        } else {
+          // Disable dice button if game complete
+          diceButton.disabled = true;
+        }
 
         // Store this move in history
         moveHistory.push({
@@ -1075,3 +1112,171 @@ document.addEventListener("keydown", (event) => {
     closeMenuFunction();
   }
 });
+
+// Add after other initializations
+function showGameCompletePopup() {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+  overlay.style.display = "flex";
+  overlay.style.justifyContent = "center";
+  overlay.style.alignItems = "center";
+  overlay.style.zIndex = "1000";
+
+  const popup = document.createElement("div");
+  popup.style.backgroundColor = "white";
+  popup.style.padding = "2rem";
+  popup.style.borderRadius = "1rem";
+  popup.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+  popup.style.textAlign = "center";
+
+  const message = document.createElement("h2");
+  message.textContent = `Hole in ${strokeCount} strokes!`;
+  message.style.marginBottom = "1rem";
+  message.style.color = "#333";
+
+  const playAgainButton = document.createElement("button");
+  playAgainButton.textContent = "Play Again";
+  playAgainButton.style.padding = "0.5rem 1rem";
+  playAgainButton.style.fontSize = "1rem";
+  playAgainButton.style.backgroundColor = "#4CAF50";
+  playAgainButton.style.color = "white";
+  playAgainButton.style.border = "none";
+  playAgainButton.style.borderRadius = "0.5rem";
+  playAgainButton.style.cursor = "pointer";
+  playAgainButton.style.marginTop = "1rem";
+
+  playAgainButton.addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    initializeGame();
+    diceButton.disabled = false;
+    diceResult.textContent = "?";
+    strokeCount = 0;
+    document.getElementById("movesLeft").textContent = strokeCount;
+  });
+
+  popup.appendChild(message);
+  popup.appendChild(playAgainButton);
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+}
+
+// Add function to check if ball has reached hole
+function checkGameComplete(ballX, ballY) {
+  if (ballX === GOLF.hole.x && ballY === GOLF.hole.y) {
+    setTimeout(() => {
+      showGameCompletePopup();
+    }, 500); // Show popup after animation completes
+    return true;
+  }
+  return false;
+}
+
+// Add after other popup-related functions
+function showRulesPopup() {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+  overlay.style.display = "flex";
+  overlay.style.justifyContent = "center";
+  overlay.style.alignItems = "center";
+  overlay.style.zIndex = "1000";
+
+  const popup = document.createElement("div");
+  popup.style.backgroundColor = "white";
+  popup.style.padding = "2rem";
+  popup.style.borderRadius = "1rem";
+  popup.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+  popup.style.maxWidth = "80%";
+  popup.style.maxHeight = "80vh";
+  popup.style.overflowY = "auto";
+
+  const title = document.createElement("h2");
+  title.textContent = "How to Play";
+  title.style.marginBottom = "1.5rem";
+  title.style.color = "#333";
+  title.style.borderBottom = "2px solid #eee";
+  title.style.paddingBottom = "0.5rem";
+
+  const rulesList = document.createElement("div");
+  rulesList.style.textAlign = "left";
+  rulesList.style.lineHeight = "1.6";
+
+  const rules = [
+    {
+      title: "Objective",
+      text: "Get the black ball into the hole in as few strokes as possible.",
+    },
+    {
+      title: "Controls",
+      text: "1. Roll the dice to determine how far you can move\n2. Click on a highlighted square to move the ball",
+    },
+    {
+      title: "Movement",
+      text: "• Move straight or diagonally up to the dice value\n• Path must be clear of obstacles",
+    },
+    {
+      title: "Obstacles",
+      text: "🌲 Trees: Cannot move through or land on trees\n💧 Water: Cannot move through or land on water\n🏖️ Sand: Requires one extra movement point to land on",
+    },
+    {
+      title: "Scoring",
+      text: "Each dice roll counts as one stroke. Try to complete the hole in as few strokes as possible!",
+    },
+  ];
+
+  rules.forEach((rule) => {
+    const ruleSection = document.createElement("div");
+    ruleSection.style.marginBottom = "1.5rem";
+
+    const ruleTitle = document.createElement("h3");
+    ruleTitle.textContent = rule.title;
+    ruleTitle.style.color = "#444";
+    ruleTitle.style.marginBottom = "0.5rem";
+
+    const ruleText = document.createElement("p");
+    ruleText.style.color = "#666";
+    ruleText.style.whiteSpace = "pre-line";
+    ruleText.textContent = rule.text;
+
+    ruleSection.appendChild(ruleTitle);
+    ruleSection.appendChild(ruleText);
+    rulesList.appendChild(ruleSection);
+  });
+
+  const closeButton = document.createElement("button");
+  closeButton.textContent = "Got it!";
+  closeButton.style.padding = "0.5rem 1rem";
+  closeButton.style.fontSize = "1rem";
+  closeButton.style.backgroundColor = "#4CAF50";
+  closeButton.style.color = "white";
+  closeButton.style.border = "none";
+  closeButton.style.borderRadius = "0.5rem";
+  closeButton.style.cursor = "pointer";
+  closeButton.style.marginTop = "1rem";
+
+  closeButton.addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    closeMenuFunction(); // Close the menu when rules are closed
+  });
+
+  popup.appendChild(title);
+  popup.appendChild(rulesList);
+  popup.appendChild(closeButton);
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+}
+
+// Modify the event listener addition to check for element existence
+const howToPlayButton = document.getElementById("howToPlay");
+if (howToPlayButton) {
+  howToPlayButton.addEventListener("click", showRulesPopup);
+}
