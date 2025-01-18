@@ -1,16 +1,41 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Game</title>
+    <title>Mini Gold - MVPJoy.com</title>
     <link rel="stylesheet" href="styles.css" />
     <!-- scale -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4CAF50" />
+    <meta name="description" content="A fun mini golf game with dice rolls" />
+    <link rel="manifest" href="manifest.json" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="192x192"
+      href="icons/icon-192.png"
+    />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap"
       rel="stylesheet"
     />
+    <link rel="icon" type="image/png" href="icons/favicon.png" />
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((registration) => {
+              console.log("ServiceWorker registration successful");
+            })
+            .catch((err) => {
+              console.log("ServiceWorker registration failed: ", err);
+            });
+        });
+      }
+    </script>
   </head>
   <body>
     <div class="menu-overlay" id="menuOverlay"></div>
@@ -27,6 +52,11 @@
         <button class="menu-item" id="howToPlay">
           <span>❓ How to Play</span>
         </button>
+        <a href="https://mvpjoy.com" target="_blank">
+          <button class="menu-item" id="howToPlay">
+            <span>🎁 Build Yours</span>
+          </button>
+        </a>
       </div>
     </div>
     <div class="header">
