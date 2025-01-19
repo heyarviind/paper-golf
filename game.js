@@ -47,10 +47,7 @@ function onImageLoad() {
 
 // Initialize game objects
 const SLOPES = []; // Store slope positions and directions
-const FIRE = {
-  x: 0,
-  y: 0,
-};
+const FIRES = []; // Store multiple fire positions
 
 // Add after canvas dimensions setup and before image loading
 const POND = {
@@ -187,8 +184,7 @@ function isValidGolfPosition(x, y) {
     y >= 0 &&
     y < CONTAINER_HEIGHT_COUNT &&
     !isInsidePond(x, y) &&
-    !treePositions.has(`${x},${y}`) &&
-    !isFirePosition(x, y)
+    !treePositions.has(`${x},${y}`)
   );
 }
 
@@ -598,7 +594,8 @@ function highlightPossibleMoves() {
           }
         }
 
-        if (pathIsClear) {
+        // Only add to highlighted positions if not landing on fire
+        if (pathIsClear && !isFirePosition(finalX, finalY)) {
           highlightedPositions.add(`${finalX},${finalY}`);
         }
       }
@@ -657,27 +654,55 @@ function checkForValidMoves() {
   return true;
 }
 
+// Add function to calculate distance to hole
+function getDistanceToHole() {
+  const dx = Math.abs(GOLF.hole.x - GOLF.ball.x);
+  const dy = Math.abs(GOLF.hole.y - GOLF.ball.y);
+  return Math.max(dx, dy); // Use max for diagonal movement
+}
+
 // Modify dice roll handler
 diceButton.addEventListener("click", () => {
   diceButton.disabled = true;
   highlightedPositions.clear();
-  diceResult.classList.remove("shake"); // Reset shake class
+  diceResult.classList.remove("shake");
 
   let rolls = 0;
   const maxRolls = 10;
-  const rollInterval = setInterval(() => {
-    const rollValue = Math.floor(Math.random() * 6) + 1;
-    diceResult.textContent = rollValue;
-    rolls++;
+  const distanceToHole = getDistanceToHole();
 
-    if (rolls >= maxRolls) {
-      clearInterval(rollInterval);
-      currentDiceValue = rollValue;
-      movesRemaining = rollValue;
-      document.getElementById("movesLeft").textContent = movesRemaining;
-      highlightPossibleMoves(); // This will now check for valid moves
-    }
-  }, 100);
+  // If within 3 containers of hole, return exact distance needed
+  if (distanceToHole <= 3) {
+    const rollInterval = setInterval(() => {
+      const rollValue = Math.floor(Math.random() * 6) + 1;
+      diceResult.textContent = rollValue;
+      rolls++;
+
+      if (rolls >= maxRolls) {
+        clearInterval(rollInterval);
+        currentDiceValue = distanceToHole;
+        diceResult.textContent = distanceToHole;
+        movesRemaining = distanceToHole;
+        document.getElementById("movesLeft").textContent = movesRemaining;
+        highlightPossibleMoves();
+      }
+    }, 100);
+  } else {
+    // Normal random roll
+    const rollInterval = setInterval(() => {
+      const rollValue = Math.floor(Math.random() * 6) + 1;
+      diceResult.textContent = rollValue;
+      rolls++;
+
+      if (rolls >= maxRolls) {
+        clearInterval(rollInterval);
+        currentDiceValue = rollValue;
+        movesRemaining = rollValue;
+        document.getElementById("movesLeft").textContent = movesRemaining;
+        highlightPossibleMoves();
+      }
+    }, 100);
+  }
 });
 
 // Add after other initializations
@@ -876,6 +901,18 @@ canvas.addEventListener("click", (event) => {
       if (rawProgress < 1) {
         requestAnimationFrame(animate);
       } else {
+        // Check if landed on fire
+        if (isFirePosition(clickX, clickY)) {
+          GOLF.ball.x = clickX;
+          GOLF.ball.y = clickY;
+          drawContainers();
+          drawGolfElements();
+          setTimeout(() => {
+            showGameOverPopup();
+          }, 500);
+          return;
+        }
+
         // Get next position considering slopes
         const nextPos = getNextPosition(clickX, clickY);
 
@@ -1013,65 +1050,85 @@ refreshButton.addEventListener("click", () => {
 
 // Add this function after other initializations but before event listeners
 function initializeGame() {
-  // Reset game state variables
-  currentDiceValue = 0;
-  movesRemaining = 0;
-  moveHistory = [];
-  highlightedPositions.clear();
-  treePositions.clear();
+  let validLayoutFound = false;
+  let layoutAttempts = 0;
+  const maxLayoutAttempts = 50;
 
-  // Generate new pond position and shape
-  POND.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 14));
-  POND.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 14));
-  POND.width = Math.floor(Math.random() * 9) + 6;
+  while (!validLayoutFound && layoutAttempts < maxLayoutAttempts) {
+    // Reset game state variables
+    currentDiceValue = 0;
+    movesRemaining = 0;
+    moveHistory = [];
+    highlightedPositions.clear();
+    treePositions.clear();
+    SLOPES.length = 0;
+    FIRES.length = 0;
 
-  do {
-    POND.height = Math.floor(Math.random() * 9) + 6;
-  } while (POND.height === POND.width);
+    // Generate all game elements
+    // ... existing pond, sand generation code ...
 
-  // Generate new pond shape
-  const newPondShape = generatePondShape();
-  Object.assign(pondShape, newPondShape);
+    // Generate trees first
+    addRandomTrees();
 
-  // Find new valid positions for ball and hole
-  do {
-    GOLF.ball.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 4));
-    GOLF.ball.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 4));
-  } while (!isValidGolfPosition(GOLF.ball.x, GOLF.ball.y));
+    // Generate slopes
+    generateSlopes();
 
-  do {
-    GOLF.hole.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 4));
-    GOLF.hole.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 4));
-  } while (
-    !isValidGolfPosition(GOLF.hole.x, GOLF.hole.y) ||
-    Math.abs(GOLF.ball.x - GOLF.hole.x) < 5 ||
-    Math.abs(GOLF.ball.y - GOLF.hole.y) < 5
-  );
+    // Generate fires
+    generateFirePosition();
 
-  // Generate new sand position
-  SAND.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 8));
-  SAND.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 8));
-  SAND.width = Math.floor(Math.random() * 5) + 4;
-  SAND.height = Math.floor(Math.random() * 5) + 4;
+    // Find valid position for ball and hole
+    do {
+      GOLF.ball.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 4));
+      GOLF.ball.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 4));
+    } while (!isValidGolfPosition(GOLF.ball.x, GOLF.ball.y));
 
-  // Generate new sand shape
-  const newSandShape = generateSandShape();
-  Object.assign(sandShape, newSandShape);
+    let holeAttempts = 0;
+    const maxHoleAttempts = 100;
+    let validHoleFound = false;
 
-  // Generate new slopes
-  generateSlopes();
+    do {
+      GOLF.hole.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 4));
+      GOLF.hole.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 4));
 
-  generateFirePosition();
+      if (
+        !isInsidePond(GOLF.hole.x, GOLF.hole.y) &&
+        !isInsideSand(GOLF.hole.x, GOLF.hole.y) &&
+        !treePositions.has(`${GOLF.hole.x},${GOLF.hole.y}`) &&
+        !SLOPES.some(
+          (slope) => slope.x === GOLF.hole.x && slope.y === GOLF.hole.y
+        ) &&
+        !isFirePosition(GOLF.hole.x, GOLF.hole.y) &&
+        Math.abs(GOLF.ball.x - GOLF.hole.x) >= 5 &&
+        Math.abs(GOLF.ball.y - GOLF.hole.y) >= 5
+      ) {
+        // Check if there's a valid path from ball to hole
+        if (
+          isPathPossible(GOLF.ball.x, GOLF.ball.y, GOLF.hole.x, GOLF.hole.y)
+        ) {
+          validHoleFound = true;
+          validLayoutFound = true;
+        }
+      }
 
-  // Redraw everything
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawContainers();
-  addRandomTrees();
-  drawGolfElements();
+      holeAttempts++;
+    } while (!validHoleFound && holeAttempts < maxHoleAttempts);
+
+    layoutAttempts++;
+  }
+
+  // If we couldn't find a valid layout, try again with fewer obstacles
+  if (!validLayoutFound) {
+    return initializeGame();
+  }
 
   // Reset stroke count
   strokeCount = 0;
   document.getElementById("movesLeft").textContent = strokeCount;
+
+  // Redraw everything
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawContainers();
+  drawGolfElements();
 }
 
 // Modify the setupCanvas function
@@ -1480,42 +1537,99 @@ function setupGame() {
 // Call setupGame instead of setupCanvas directly
 setupGame();
 
-// Add function to generate fire position
+// Modify generateFirePosition to ensure no overlaps
 function generateFirePosition() {
-  let isValidPosition = false;
-  while (!isValidPosition) {
-    FIRE.x = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 2)) + 1;
-    FIRE.y = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 2)) + 1;
+  // Clear existing fires
+  FIRES.length = 0;
 
-    // Check if position is valid (not on other objects or ball/hole)
-    if (
-      !isInsidePond(FIRE.x, FIRE.y) &&
-      !isInsideSand(FIRE.x, FIRE.y) &&
-      !treePositions.has(`${FIRE.x},${FIRE.y}`) &&
-      !SLOPES.some((slope) => slope.x === FIRE.x && slope.y === FIRE.y) &&
-      !(FIRE.x === GOLF.ball.x && FIRE.y === GOLF.ball.y) &&
-      !(FIRE.x === GOLF.hole.x && FIRE.y === GOLF.hole.y)
-    ) {
-      isValidPosition = true;
+  // Generate 2-3 fires in a group
+  const fireCount = Math.floor(Math.random() * 2) + 2;
+
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (FIRES.length < fireCount && attempts < maxAttempts) {
+    // Clear fires and try a new position
+    FIRES.length = 0;
+
+    // Find a valid starting position for the group
+    const startX = Math.floor(Math.random() * (CONTAINER_WIDTH_COUNT - 3)) + 1;
+    const startY = Math.floor(Math.random() * (CONTAINER_HEIGHT_COUNT - 3)) + 1;
+
+    // Check if the 2x2 area is completely free of obstacles
+    let areaIsClear = true;
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dx = 0; dx <= 1; dx++) {
+        const checkX = startX + dx;
+        const checkY = startY + dy;
+
+        if (
+          isInsidePond(checkX, checkY) ||
+          isInsideSand(checkX, checkY) ||
+          treePositions.has(`${checkX},${checkY}`) ||
+          SLOPES.some((slope) => slope.x === checkX && slope.y === checkY) ||
+          (checkX === GOLF.ball.x && checkY === GOLF.ball.y) ||
+          (checkX === GOLF.hole.x && checkY === GOLF.hole.y)
+        ) {
+          areaIsClear = false;
+          break;
+        }
+      }
+      if (!areaIsClear) break;
     }
+
+    if (areaIsClear) {
+      // Add fires in a 2x2 pattern
+      const positions = [
+        { x: startX, y: startY },
+        { x: startX + 1, y: startY },
+        { x: startX, y: startY + 1 },
+        { x: startX + 1, y: startY + 1 },
+      ];
+
+      // Shuffle positions
+      for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+      }
+
+      // Add the required number of fires
+      for (let i = 0; i < fireCount; i++) {
+        FIRES.push(positions[i]);
+      }
+    }
+
+    attempts++;
+  }
+
+  // If we couldn't place the fires after max attempts, try again
+  if (FIRES.length < fireCount) {
+    generateFirePosition();
   }
 }
 
-// Add function to draw fire
+// Modify drawFire to draw all fires
 function drawFire() {
-  const fireSize = CONTAINER_SIZE * 0.9;
-  const posX = FIRE.x * CONTAINER_SIZE + (CONTAINER_SIZE - fireSize) / 2;
-  const posY = FIRE.y * CONTAINER_SIZE + (CONTAINER_SIZE - fireSize) / 2;
+  FIRES.forEach((fire) => {
+    const fireSize = CONTAINER_SIZE * 0.9;
+    const posX = fire.x * CONTAINER_SIZE + (CONTAINER_SIZE - fireSize) / 2;
+    const posY = fire.y * CONTAINER_SIZE + (CONTAINER_SIZE - fireSize) / 2;
 
-  // Add a subtle glow effect
-  ctx.save();
-  ctx.shadowColor = "rgba(255, 68, 68, 0.5)";
-  ctx.shadowBlur = 10;
+    // Add a subtle glow effect
+    ctx.save();
+    ctx.shadowColor = "rgba(255, 68, 68, 0.5)";
+    ctx.shadowBlur = 10;
 
-  // Draw the fire image
-  ctx.drawImage(fireImage, posX, posY, fireSize, fireSize);
+    // Draw the fire image
+    ctx.drawImage(fireImage, posX, posY, fireSize, fireSize);
 
-  ctx.restore();
+    ctx.restore();
+  });
+}
+
+// Modify isFirePosition to check all fires
+function isFirePosition(x, y) {
+  return FIRES.some((fire) => fire.x === x && fire.y === y);
 }
 
 // Add game over popup function
@@ -1575,7 +1689,51 @@ function showGameOverPopup() {
   document.body.appendChild(overlay);
 }
 
-// Add function to check if a position intersects with fire
-function isFirePosition(x, y) {
-  return x === FIRE.x && y === FIRE.y;
+// Add this function to check if a path exists between two points
+function isPathPossible(startX, startY, endX, endY) {
+  const visited = new Set();
+  const queue = [{ x: startX, y: startY }];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = `${current.x},${current.y}`;
+
+    if (current.x === endX && current.y === endY) {
+      return true;
+    }
+
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    // Check all 8 directions
+    const directions = [
+      { dx: 1, dy: 0 }, // right
+      { dx: -1, dy: 0 }, // left
+      { dx: 0, dy: 1 }, // down
+      { dx: 0, dy: -1 }, // up
+      { dx: 1, dy: 1 }, // diagonal down-right
+      { dx: 1, dy: -1 }, // diagonal up-right
+      { dx: -1, dy: 1 }, // diagonal down-left
+      { dx: -1, dy: -1 }, // diagonal up-left
+    ];
+
+    for (const dir of directions) {
+      const nextX = current.x + dir.dx;
+      const nextY = current.y + dir.dy;
+
+      if (
+        nextX >= 0 &&
+        nextX < CONTAINER_WIDTH_COUNT &&
+        nextY >= 0 &&
+        nextY < CONTAINER_HEIGHT_COUNT &&
+        !isInsidePond(nextX, nextY) &&
+        !treePositions.has(`${nextX},${nextY}`) &&
+        !isFirePosition(nextX, nextY)
+      ) {
+        queue.push({ x: nextX, y: nextY });
+      }
+    }
+  }
+
+  return false;
 }
